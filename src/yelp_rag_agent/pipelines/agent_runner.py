@@ -26,14 +26,12 @@ import time
 import warnings
 from typing import Optional
 
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     from langgraph.prebuilt import create_react_agent
 
-from yelp_rag_agent.config import OLLAMA_BASE_URL, OLLAMA_MODEL
 from yelp_rag_agent.tools.retrieval_tool import (
     search_review_chunks_global,
     search_review_chunks_by_business,
@@ -61,17 +59,40 @@ Guidelines:
 """
 
 _agent = None
+_agent_backend = None  # track which backend instance was used to build the agent
+
+
+def _make_chat_model():
+    """Create a LangChain chat model appropriate for the active backend."""
+    from yelp_rag_agent.tools.summarizer_tool import _backend
+    from yelp_rag_agent.backends.ollama import OllamaBackend
+    from yelp_rag_agent.backends.lmdeploy import LMDeployBackend
+
+    if _backend is None:
+        raise RuntimeError("No backend set. Call set_backend() before running the agent.")
+
+    if isinstance(_backend, OllamaBackend):
+        from langchain_ollama import ChatOllama
+        return ChatOllama(base_url=_backend.base_url, model=_backend.model, temperature=0)
+
+    if isinstance(_backend, LMDeployBackend):
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            base_url=f"{_backend.base_url}/v1",
+            api_key="none",
+            model=_backend.model,
+            temperature=0,
+        )
+
+    raise RuntimeError(f"Unsupported backend type for agent: {type(_backend).__name__}")
 
 
 def _get_agent():
-    global _agent
-    if _agent is None:
+    global _agent, _agent_backend
+    from yelp_rag_agent.tools.summarizer_tool import _backend
+    if _agent is None or _backend is not _agent_backend:
         print("[agent_runner] Initialising LangGraph ReAct agent …")
-        llm = ChatOllama(
-            base_url=OLLAMA_BASE_URL,
-            model=OLLAMA_MODEL,
-            temperature=0,
-        )
+        llm = _make_chat_model()
         tools = [
             search_review_chunks_global,
             search_review_chunks_by_business,
@@ -80,6 +101,7 @@ def _get_agent():
             summarize_evidence,
         ]
         _agent = create_react_agent(llm, tools)
+        _agent_backend = _backend
         print("[agent_runner] Agent ready.")
     return _agent
 
@@ -121,7 +143,9 @@ def run_agent(
         full_question = f"{question}\n\n[Target business_id: {business_id}]"
 
     print(f"\n{'='*60}")
-    print(f"Agent Pipeline  |  model={OLLAMA_MODEL}")
+    from yelp_rag_agent.tools.summarizer_tool import _backend
+    model_label = _backend.model if _backend else "unknown"
+    print(f"Agent Pipeline  |  model={model_label}")
     print(f"Question: {question}")
     if business_id:
         print(f"Business ID: {business_id}")

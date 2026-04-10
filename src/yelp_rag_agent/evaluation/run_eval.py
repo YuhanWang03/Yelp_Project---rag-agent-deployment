@@ -25,7 +25,7 @@ from typing import Optional
 
 import requests
 
-from yelp_rag_agent.config import OLLAMA_BASE_URL, OLLAMA_MODEL, RESULTS_DIR, load_config
+from yelp_rag_agent.config import RESULTS_DIR, load_config
 from yelp_rag_agent.backends import load_backend
 from yelp_rag_agent.tools.summarizer_tool import set_backend
 from yelp_rag_agent.pipelines.rag_baseline import run_rag_pipeline
@@ -56,8 +56,8 @@ def _has_evidence(answer: str) -> bool:
     return any(sig in lowered for sig in EVIDENCE_SIGNALS)
 
 
-def run_direct_llm(question: str, business_id: Optional[str],
-                   base_url: str, model: str) -> dict:
+def run_direct_llm(question: str, business_id: Optional[str]) -> dict:
+    from yelp_rag_agent.tools.summarizer_tool import _backend
     if business_id:
         prompt = (f"You are a Yelp review analyst.\n"
                   f"Answer the following question about Yelp business ID: {business_id}\n\n"
@@ -68,16 +68,7 @@ def run_direct_llm(question: str, business_id: Optional[str],
 
     t0 = time.time()
     try:
-        resp = requests.post(
-            f"{base_url}/api/chat",
-            json={"model": model,
-                  "messages": [{"role": "user", "content": prompt}],
-                  "stream": False,
-                  "options": {"temperature": 0}},
-            timeout=120,
-        )
-        resp.raise_for_status()
-        answer = resp.json()["message"]["content"]
+        answer = _backend.generate(prompt, temperature=0)
     except Exception as e:
         answer = f"[ERROR] {e}"
 
@@ -126,12 +117,14 @@ def run_full_agent(question: str, business_id: Optional[str]) -> dict:
 
 
 def run_evaluation(config_path: str, output_name: str = "eval_results.csv",
-                   resume: bool = True) -> None:
+                   resume: bool = True,
+                   overrides: Optional[dict] = None) -> None:
     cfg        = load_config(config_path)
-    base_url   = cfg.get("base_url", OLLAMA_BASE_URL)
-    model_name = cfg.get("model", OLLAMA_MODEL)
+    if overrides:
+        cfg.update(overrides)
+    model_name = cfg.get("model", "unknown")
 
-    backend = load_backend(config_path)
+    backend = load_backend(config_path, overrides=overrides)
     set_backend(backend)
 
     questions  = json.loads(QUESTIONS_PATH.read_text(encoding="utf-8"))
@@ -162,8 +155,7 @@ def run_evaluation(config_path: str, output_name: str = "eval_results.csv",
             question = q["question"]
 
             systems = [
-                ("direct_llm",
-                 lambda qu, bi: run_direct_llm(qu, bi, base_url, model_name)),
+                ("direct_llm",   run_direct_llm),
                 ("rag_baseline", run_rag),
                 ("full_agent",   run_full_agent),
             ]
