@@ -1,0 +1,5 @@
+backend: lmdeploy
+model: Qwen/Qwen2.5-7B-Instruct-AWQ
+base_url: http://localhost:23333
+temperature: 0.1
+timeout: 180

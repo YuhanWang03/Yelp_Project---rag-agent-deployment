@@ -1,0 +1,142 @@
+[
+  {
+    "id": "CM_01",
+    "type": "Complaint Mining",
+    "business_id": "ORL4JE6tz3rJxVqkdKfegA",
+    "question": "What do customers complain about most at this business?",
+    "note": "Low-rated hotel, avg 2.42★, 182 reviews"
+  },
+  {
+    "id": "CM_02",
+    "type": "Complaint Mining",
+    "business_id": "ompDR5sUDpoI6gnTldmneQ",
+    "question": "What are the most frequent negative experiences customers report here?",
+    "note": "Low-rated business, avg 2.56★, 123 reviews"
+  },
+  {
+    "id": "CM_03",
+    "type": "Complaint Mining",
+    "business_id": "ORL4JE6tz3rJxVqkdKfegA",
+    "question": "Which aspects of this business receive the most criticism in reviews?",
+    "note": "Low-rated hotel — tests aspect-level complaint extraction"
+  },
+  {
+    "id": "CM_04",
+    "type": "Complaint Mining",
+    "business_id": "GBTPC53ZrG1ZBY3DT8Mbcw",
+    "question": "What problems do unhappy customers mention most often?",
+    "note": "Mid-rated business, avg 3.46★, 421 reviews — mixed signal"
+  },
+  {
+    "id": "CM_05",
+    "type": "Complaint Mining",
+    "business_id": "ompDR5sUDpoI6gnTldmneQ",
+    "question": "Summarise the top three complaints found in the negative reviews of this business.",
+    "note": "Requires ranking — tests synthesis depth"
+  },
+  {
+    "id": "AA_01",
+    "type": "Aspect Analysis",
+    "business_id": "2KIDQyTh-HzLxOUEDqtDBg",
+    "question": "How do customers describe the service and staff at this business?",
+    "note": "High-rated grocery, avg 4.13★, 62 reviews"
+  },
+  {
+    "id": "AA_02",
+    "type": "Aspect Analysis",
+    "business_id": "ORL4JE6tz3rJxVqkdKfegA",
+    "question": "What do customers say about the cleanliness and room conditions at this business?",
+    "note": "Hotel — room/cleanliness aspect"
+  },
+  {
+    "id": "AA_03",
+    "type": "Aspect Analysis",
+    "business_id": "GBTPC53ZrG1ZBY3DT8Mbcw",
+    "question": "How is the food quality described in customer reviews?",
+    "note": "Mid-rated business — food aspect"
+  },
+  {
+    "id": "AA_04",
+    "type": "Aspect Analysis",
+    "business_id": "AzseSGgDC6bVtMPEYo1CNQ",
+    "question": "What do reviewers say about the value for money at this business?",
+    "note": "High-rated business, avg 4.22★, 51 reviews — price/value aspect"
+  },
+  {
+    "id": "AA_05",
+    "type": "Aspect Analysis",
+    "business_id": "GBTPC53ZrG1ZBY3DT8Mbcw",
+    "question": "How do customers rate the waiting time and overall efficiency of service?",
+    "note": "Mid-rated business — speed/efficiency aspect"
+  },
+  {
+    "id": "BP_01",
+    "type": "Business Profiling",
+    "business_id": "ORL4JE6tz3rJxVqkdKfegA",
+    "question": "Give an overall profile of this business based on customer reviews.",
+    "note": "Low-rated hotel — broad profiling"
+  },
+  {
+    "id": "BP_02",
+    "type": "Business Profiling",
+    "business_id": "2KIDQyTh-HzLxOUEDqtDBg",
+    "question": "What are the main strengths and weaknesses of this business according to reviewers?",
+    "note": "High-rated grocery — strength/weakness framing"
+  },
+  {
+    "id": "BP_03",
+    "type": "Business Profiling",
+    "business_id": "GBTPC53ZrG1ZBY3DT8Mbcw",
+    "question": "Would you recommend this business based on what customers say? Why or why not?",
+    "note": "Mid-rated business — recommendation framing"
+  },
+  {
+    "id": "BP_04",
+    "type": "Business Profiling",
+    "business_id": "AzseSGgDC6bVtMPEYo1CNQ",
+    "question": "What type of customers seem to enjoy this business the most, based on reviews?",
+    "note": "High-rated — customer segment profiling"
+  },
+  {
+    "id": "BP_05",
+    "type": "Business Profiling",
+    "business_id": "ompDR5sUDpoI6gnTldmneQ",
+    "question": "How has the quality of this business been described across different aspects such as food, service, and environment?",
+    "note": "Low-rated — multi-aspect profiling"
+  },
+  {
+    "id": "CP_01",
+    "type": "Cross-Business Pattern",
+    "business_id": null,
+    "question": "What service problems appear most often in low-rated reviews?",
+    "note": "Global — service failure patterns"
+  },
+  {
+    "id": "CP_02",
+    "type": "Cross-Business Pattern",
+    "business_id": null,
+    "question": "Find reviews that mention extremely long wait times.",
+    "note": "Global — wait time retrieval"
+  },
+  {
+    "id": "CP_03",
+    "type": "Cross-Business Pattern",
+    "business_id": null,
+    "question": "What do customers commonly praise in 5-star reviews?",
+    "note": "Global — positive pattern extraction"
+  },
+  {
+    "id": "CP_04",
+    "type": "Cross-Business Pattern",
+    "business_id": null,
+    "question": "What are the most common reasons customers say they will never return?",
+    "note": "Global — churn signal patterns"
+  },
+  {
+    "id": "CP_05",
+    "type": "Cross-Business Pattern",
+    "business_id": null,
+    "question": "Are there recurring complaints about food safety or hygiene across reviews?",
+    "note": "Global — food safety signal"
+  }
+]
