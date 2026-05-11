@@ -48,7 +48,7 @@ import gradio as gr
 # ---------------------------------------------------------------------------
 # Detect environment
 # ---------------------------------------------------------------------------
-IS_HF_SPACE = os.environ.get("HF_SPACE_ID") is not None
+IS_HF_SPACE = os.environ.get("SPACE_ID") is not None
 
 # ---------------------------------------------------------------------------
 # HF Spaces: download large files from Hub before anything else imports them
