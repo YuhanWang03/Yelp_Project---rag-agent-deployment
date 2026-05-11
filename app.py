@@ -75,11 +75,16 @@ if IS_HF_SPACE:
     os.makedirs("artifacts",            exist_ok=True)
 
     def _link(src, dst):
-        if os.path.exists(src) and not os.path.exists(dst):
-            shutil.copy2(src, dst)
-            print(f"  Copied: {dst}")
-        elif not os.path.exists(src):
+        if not os.path.exists(src):
             print(f"  WARNING: not found: {src}")
+            return
+        if os.path.exists(dst):
+            return
+        if os.path.isdir(src):
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+        print(f"  Copied: {dst}")
 
     _link(f"{data_dir}/vectorstore/review_chunks.index", "vectorstore/review_chunks.index")
     _link(f"{data_dir}/vectorstore/review_chunks.pkl",   "vectorstore/review_chunks.pkl")
