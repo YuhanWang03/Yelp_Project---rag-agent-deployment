@@ -13,7 +13,7 @@ numpy
 pandas
 requests
 pyyaml
-huggingface_hub
+huggingface_hub<0.26
 
 # Notebook / analysis (Stage D)
 matplotlib
