@@ -1,41 +1,120 @@
 """
 Yelp Business Intelligence Agent — Gradio Demo
 
-Usage:
+Local usage:
     python app.py                                   # Ollama backend (default)
     python app.py --config configs/lmdeploy.yaml    # LMDeploy backend
-    python app.py --config configs/ollama.yaml --model qwen2.5:14b  # override model
     python app.py --share                           # public Gradio link
+
+Hugging Face Spaces:
+    Automatically detected via HF_SPACE_ID env var.
+    Set the following Spaces secrets:
+        HF_TOKEN         — your HuggingFace token (Inference API access)
+        HF_DATASET_REPO  — e.g. your-username/yelp-rag-data
+        HF_MODEL_REPO    — e.g. your-username/yelp-roberta-5class
 """
 
-import argparse
+import ast
 import json
 import os
 import pickle
 import time
 
+
+def _parse_tool_output(raw):
+    """Parse tool output that may be JSON, Python repr, or already a dict/list."""
+    if isinstance(raw, (dict, list)):
+        return raw
+    if not isinstance(raw, str):
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    try:
+        return ast.literal_eval(raw)
+    except (ValueError, SyntaxError):
+        return None
+
 import gradio as gr
 
+# ---------------------------------------------------------------------------
+# Detect environment
+# ---------------------------------------------------------------------------
+IS_HF_SPACE = os.environ.get("HF_SPACE_ID") is not None
+
+# ---------------------------------------------------------------------------
+# HF Spaces: download large files from Hub before anything else imports them
+# ---------------------------------------------------------------------------
+if IS_HF_SPACE:
+    from huggingface_hub import snapshot_download
+    import shutil
+
+    HF_TOKEN       = os.environ.get("HF_TOKEN")
+    DATASET_REPO   = os.environ.get("HF_DATASET_REPO", "your-username/yelp-rag-data")
+    MODEL_REPO     = os.environ.get("HF_MODEL_REPO",   "your-username/yelp-roberta-5class")
+
+    print(f"[HF Spaces] Downloading data from {DATASET_REPO} ...")
+    data_dir = snapshot_download(
+        repo_id   = DATASET_REPO,
+        repo_type = "dataset",
+        token     = HF_TOKEN,
+        local_dir = "/tmp/yelp_data",
+    )
+    # Link into expected project paths
+    os.makedirs("vectorstore",          exist_ok=True)
+    os.makedirs("data/processed",       exist_ok=True)
+    os.makedirs("data/raw",             exist_ok=True)
+    os.makedirs("artifacts",            exist_ok=True)
+
+    def _link(src, dst):
+        if os.path.exists(src) and not os.path.exists(dst):
+            shutil.copy2(src, dst)
+            print(f"  Copied: {dst}")
+        elif not os.path.exists(src):
+            print(f"  WARNING: not found: {src}")
+
+    _link(f"{data_dir}/vectorstore/review_chunks.index", "vectorstore/review_chunks.index")
+    _link(f"{data_dir}/vectorstore/review_chunks.pkl",   "vectorstore/review_chunks.pkl")
+    _link(f"{data_dir}/yelp_reviews_sampled_50k.csv",    "data/processed/yelp_reviews_sampled_50k.csv")
+    _link(f"{data_dir}/yelp_academic_dataset_business.json", "data/raw/yelp_academic_dataset_business.json")
+
+    print(f"[HF Spaces] Downloading model from {MODEL_REPO} ...")
+    model_dir = snapshot_download(
+        repo_id   = MODEL_REPO,
+        repo_type = "model",
+        token     = HF_TOKEN,
+        local_dir = "/tmp/yelp_model",
+    )
+    _link(model_dir, "artifacts/roberta_5class_best")
+
+    print("[HF Spaces] All files ready.")
+
+# ---------------------------------------------------------------------------
+# Backend setup
+# ---------------------------------------------------------------------------
 from yelp_rag_agent.config import VECTORSTORE_META, BUSINESS_JSON, load_config
 from yelp_rag_agent.backends import load_backend
 from yelp_rag_agent.tools.summarizer_tool import set_backend
 from yelp_rag_agent.pipelines.rag_baseline import run_rag_pipeline
 from yelp_rag_agent.pipelines.agent_runner import run_agent
 
-# ---------------------------------------------------------------------------
-# Parse args early so backend is ready before UI loads
-# ---------------------------------------------------------------------------
-parser = argparse.ArgumentParser()
-parser.add_argument("--config", default="configs/ollama.yaml")
-parser.add_argument("--model",  default=None, help="Override model in YAML")
-parser.add_argument("--share",  action="store_true")
-parser.add_argument("--port",   type=int, default=7860)
-args = parser.parse_args()
-
-overrides = {"model": args.model} if args.model else None
-backend   = load_backend(args.config, overrides=overrides)
-set_backend(backend)
-print(f"Backend loaded: {args.config}")
+if IS_HF_SPACE:
+    backend = load_backend("configs/hf_spaces.yaml")
+    set_backend(backend)
+    print(f"[HF Spaces] Backend: {backend.model}")
+else:
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="configs/ollama.yaml")
+    parser.add_argument("--model",  default=None, help="Override model in YAML")
+    parser.add_argument("--share",  action="store_true")
+    parser.add_argument("--port",   type=int, default=7860)
+    args    = parser.parse_args()
+    overrides = {"model": args.model} if args.model else None
+    backend   = load_backend(args.config, overrides=overrides)
+    set_backend(backend)
+    print(f"Backend loaded: {args.config}")
 
 # ---------------------------------------------------------------------------
 # Business catalogue
@@ -68,7 +147,7 @@ def _load_business_catalogue() -> dict:
 print("Loading business catalogue…")
 CATALOGUE = _load_business_catalogue()
 
-_sorted_bizs    = sorted(CATALOGUE.items(), key=lambda x: -x[1]["chunk_count"])
+_sorted_bizs     = sorted(CATALOGUE.items(), key=lambda x: -x[1]["chunk_count"])
 DROPDOWN_CHOICES = ["(Global search — no specific business)"] + [
     f"{info['name']} — {info['city']} (★{info['stars']}, {info['chunk_count']} chunks)"
     for _, info in _sorted_bizs
@@ -84,17 +163,46 @@ print(f"Catalogue loaded: {len(CATALOGUE)} businesses available.")
 # Example queries
 # ---------------------------------------------------------------------------
 EXAMPLES = [
+    # — Complaint Mining (negative pattern extraction) ———————————————————
     ["What do customers complain about most at this business?",
      "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
      "RAG Baseline"],
+    ["What do customers complain about most at this business?",
+     "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
+     "Direct LLM"],
     ["Analyze the main weaknesses of this business based on reviews.",
      "Santa Barbara Shellfish Company — Santa Barbara (★4.0, 203 chunks)",
      "Full Agent"],
-    ["What aspects do customers praise and criticize about food and service?",
-     "(Global search — no specific business)", "RAG Baseline"],
+    ["Summarise the top three complaints in the negative reviews of this business.",
+     "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
+     "RAG Baseline"],
+
+    # — Aspect Analysis (focused on one dimension) ———————————————————————
+    ["How is the food quality described in customer reviews?",
+     "Santa Barbara Shellfish Company — Santa Barbara (★4.0, 203 chunks)",
+     "RAG Baseline"],
+    ["How do customers describe the service and staff at this business?",
+     "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
+     "Full Agent"],
+    ["What do reviewers say about cleanliness and room conditions?",
+     "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
+     "RAG Baseline"],
+
+    # — Business Profiling (holistic overview) ———————————————————————————
     ["Give me an overall profile of this business based on customer reviews.",
      "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
      "Full Agent"],
+    ["What are the main strengths and weaknesses of this business?",
+     "Santa Barbara Shellfish Company — Santa Barbara (★4.0, 203 chunks)",
+     "RAG Baseline"],
+
+    # — Cross-Business Patterns (no specific business) ———————————————————
+    ["What aspects do customers praise and criticize about food and service?",
+     "(Global search — no specific business)", "RAG Baseline"],
+    ["What do customers commonly praise in 5-star reviews?",
+     "(Global search — no specific business)", "Full Agent"],
+    ["What are the most common reasons customers say they will never return?",
+     "(Global search — no specific business)", "RAG Baseline"],
     ["Do Yelp reviews show any patterns between wait time complaints and star ratings?",
      "(Global search — no specific business)", "Full Agent"],
 ]
@@ -149,6 +257,8 @@ def _format_stats_from_id(business_id: str | None) -> str:
 # ---------------------------------------------------------------------------
 
 def run_query(question: str, business_id: str, system: str):
+    from yelp_rag_agent.tools.summarizer_tool import _backend as active_backend
+
     question    = question.strip()
     business_id = business_id.strip() or None
 
@@ -165,26 +275,23 @@ def run_query(question: str, business_id: str, system: str):
 
     # Direct LLM -------------------------------------------------------
     if system == "Direct LLM":
-        import requests as _req
-        cfg = load_config(args.config)
-        t0  = time.time()
+        if business_id:
+            prompt = (f"You are a Yelp review analyst.\n"
+                      f"Answer this question about Yelp business ID {business_id}:\n\n"
+                      f"{question}\n\nAnswer based only on your general knowledge.")
+        else:
+            prompt = (f"You are a Yelp review analyst.\n"
+                      f"Question: {question}\n\nAnswer based only on your general knowledge.")
+        t0 = time.time()
         try:
-            resp = _req.post(
-                f"{cfg['base_url']}/api/chat",
-                json={"model": cfg["model"],
-                      "messages": [{"role": "user", "content": question}],
-                      "stream": False},
-                timeout=120,
-            )
-            resp.raise_for_status()
-            answer = resp.json()["message"]["content"]
+            answer = active_backend.generate(prompt, temperature=0.1)
         except Exception as e:
             answer = f"Error: {e}"
-        elapsed    = round(time.time() - t0, 2)
-        answer_md  = f"### 🤖 Answer *(Direct LLM — no retrieval)*\n\n{answer}"
-        tools_md   = f"No tools used.\n\n*⏱️ Elapsed: **{elapsed}s***"
-        evid_md    = "*Direct LLM does not retrieve evidence.*"
-        stats_md   = _format_stats_from_id(business_id)
+        elapsed   = round(time.time() - t0, 2)
+        answer_md = f"### 🤖 Answer *(Direct LLM — no retrieval)*\n\n{answer}"
+        tools_md  = f"No tools used.\n\n*⏱️ Elapsed: **{elapsed}s***"
+        evid_md   = "*Direct LLM does not retrieve evidence.*"
+        stats_md  = _format_stats_from_id(business_id)
         yield answer_md, tools_md, evid_md, stats_md
         return
 
@@ -236,7 +343,9 @@ def run_query(question: str, business_id: str, system: str):
         try:
             result = run_agent(question, business_id=business_id, max_iterations=6)
         except Exception as e:
-            yield f"Agent error: {e}", "", "", ""
+            import traceback
+            traceback.print_exc()
+            yield f"Agent error: {type(e).__name__}: {e}", "", "", ""
             return
 
         answer     = result.get("final_answer") or result.get("answer", "*(No answer)*")
@@ -255,21 +364,21 @@ def run_query(question: str, business_id: str, system: str):
         tool_lines.append(f"*⏱️ Elapsed: **{elapsed}s***")
         tools_md = "\n".join(tool_lines)
 
-        evid_lines  = ["### 📑 Retrieved Evidence *(from tools)*\n"]
+        evid_lines   = ["### 📑 Retrieved Evidence *(from tools)*\n"]
         has_evidence = False
         for tc in tool_calls:
             if "search" in tc.get("tool", ""):
-                try:
-                    chunks = json.loads(tc["output"])
+                chunks = _parse_tool_output(tc["output"])
+                if isinstance(chunks, list) and chunks:
                     for c in chunks[:3]:
+                        if not isinstance(c, dict):
+                            continue
                         evid_lines.append(
-                            f"> ❝ *{c['chunk_text'][:200]}…* ❞\n> \n"
-                            f"> — *(★{c['stars']}, ID: `{c['business_id'][:8]}…`)*\n\n---\n"
+                            f"> ❝ *{c.get('chunk_text', '')[:200]}…* ❞\n> \n"
+                            f"> — *(★{c.get('stars', '?')}, ID: `{str(c.get('business_id', ''))[:8]}…`)*\n\n---\n"
                         )
                     has_evidence = True
                     break
-                except Exception:
-                    pass
         if not has_evidence:
             evid_lines.append("*No retrieval chunks found in context.*")
         evid_md = "\n".join(evid_lines)
@@ -277,10 +386,9 @@ def run_query(question: str, business_id: str, system: str):
         stats_md = ""
         for tc in tool_calls:
             if tc.get("tool") == "get_business_stats":
-                try:
-                    stats_md = _format_stats_dict(json.loads(tc["output"]))
-                except Exception:
-                    pass
+                parsed = _parse_tool_output(tc["output"])
+                if isinstance(parsed, dict):
+                    stats_md = _format_stats_dict(parsed)
                 break
         if not stats_md:
             stats_md = _format_stats_from_id(business_id)
@@ -313,8 +421,8 @@ def build_ui():
         with gr.Row(elem_id="input-row"):
             with gr.Column(scale=3):
                 gr.Markdown(
-                    "# Yelp Business Intelligence Agent\n"
-                    "**FAISS Retrieval · LangGraph ReAct · Local LLM Serving**\n\n"
+                    "# 🍽️ Yelp Business Intelligence Agent\n"
+                    "**FAISS Retrieval · LangGraph ReAct · Llama 3.1 8B Instant (Groq)**\n\n"
                     "Ask questions about Yelp businesses using three systems:\n"
                     "- **Direct LLM** — no retrieval baseline\n"
                     "- **RAG Baseline** — fixed pipeline (Stats → Search → Summarize)\n"
@@ -352,6 +460,7 @@ def build_ui():
                     examples=EXAMPLES,
                     inputs=[question_input, business_dropdown, system_input],
                     label="Quick Examples",
+                    examples_per_page=len(EXAMPLES),
                 )
 
         gr.Markdown("---")
@@ -372,28 +481,36 @@ def build_ui():
 
         gr.Markdown(
             "---\n"
-            "**Stage 4 Evaluation Results** (20 questions × 3 systems, human scored)\n\n"
-            "| System | Correctness | Evidence | Groundedness | Tool Use | Efficiency | **Total /10** |\n"
+            "### 📊 Original Research Benchmark\n"
+            "Qwen2.5-7B on A100 80GB · 20 questions · human scored 0–5 per dimension\n\n"
+            "| System | Correctness | Evidence | Groundedness | Tool Use | Efficiency | **Total /25** |\n"
             "|---|---|---|---|---|---|---|\n"
-            "| Direct LLM | 0.25 | 0.00 | 0.00 | 0.00 | 1.70 | **1.95** |\n"
-            "| RAG Baseline | 0.95 | 1.60 | 1.75 | 0.95 | 1.65 | **6.90** |\n"
-            "| Full Agent | 1.05 | 1.15 | 1.15 | 1.30 | 0.10 | **4.75** |\n\n"
-            "Hallucination Rate: Direct LLM **100%** → Full Agent **25%** → RAG Baseline **5%**"
+            "| Direct LLM | 0.20 | 0.00 | 0.00 | 0.00 | 0.95 | **1.15** |\n"
+            "| RAG Baseline | 1.75 | 1.90 | 1.95 | 2.00 | 1.90 | **9.50** |\n"
+            "| Full Agent | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | **1.00** |\n\n"
+            "**Deployment study (A100):** AWQ (turbomind) achieves **38.5× lower TTFT** and "
+            "**2.26× higher throughput** vs fp16 (pytorch) with no quality loss.\n\n"
+            "> *The live demo above runs on Groq's Llama 3.1 8B Instant for fast, free interactive use. "
+            "The benchmark numbers come from the project's original A100 deployment study with Qwen2.5-7B. "
+            "Full Agent's low score there was caused by a Qwen↔LangChain tool-calling parser incompatibility "
+            "that this Llama-based demo resolves.*"
         )
     return demo
 
 
 if __name__ == "__main__":
-    print(f"Starting Yelp Business Intelligence Agent demo…")
-    print(f"  Config : {args.config}")
-    print(f"  Port   : {args.port}")
-    print(f"  Share  : {args.share}")
-    print(f"  Businesses in dropdown: {len(CATALOGUE)}")
-
     demo = build_ui()
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=args.port,
-        share=args.share,
-        show_error=True,
-    )
+
+    if IS_HF_SPACE:
+        demo.launch(server_name="0.0.0.0")
+    else:
+        print(f"Starting Yelp Business Intelligence Agent demo…")
+        print(f"  Port  : {args.port}")
+        print(f"  Share : {args.share}")
+        print(f"  Businesses: {len(CATALOGUE)}")
+        demo.launch(
+            server_name="0.0.0.0",
+            server_port=args.port,
+            share=args.share,
+            show_error=True,
+        )

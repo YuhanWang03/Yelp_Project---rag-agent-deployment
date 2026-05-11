@@ -1,0 +1,29 @@
+{
+  "hardware": "Colab A100 80GB",
+  "experiments": [
+    {
+      "experiment_id": "lmdeploy_fp16",
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "backend": "lmdeploy-pytorch",
+      "vram_load_gb": 64.52,
+      "vram_peak_gb": 64.55,
+      "ttft_ms": 693.6,
+      "avg_response_s": 2.0,
+      "estimated_tps": 73.9,
+      "n_samples": 5,
+      "errors": 0
+    },
+    {
+      "experiment_id": "lmdeploy_awq",
+      "model": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+      "backend": "lmdeploy-turbomind",
+      "vram_load_gb": 65.3,
+      "vram_peak_gb": 65.3,
+      "ttft_ms": 18.0,
+      "avg_response_s": 0.91,
+      "estimated_tps": 166.9,
+      "n_samples": 5,
+      "errors": 0
+    }
+  ]
+}

@@ -29,8 +29,8 @@ from langchain.tools import tool
 
 from yelp_rag_agent.backends.base import BaseBackend
 
-MAX_EVIDENCE_IN_PROMPT = 10
-MAX_CHUNK_CHARS        = 400
+MAX_EVIDENCE_IN_PROMPT = 5
+MAX_CHUNK_CHARS        = 300
 
 # ---------------------------------------------------------------------------
 # Backend singleton — set at application startup
@@ -50,15 +50,43 @@ def get_backend() -> Optional[BaseBackend]:
 
 
 # ---------------------------------------------------------------------------
+# Evidence cache — chunks from the most recent retrieval
+# ---------------------------------------------------------------------------
+# Used by summarize_evidence so the Agent doesn't have to round-trip large
+# nested JSON through the LLM (which smaller models like Llama 3.1 8B
+# struggle to produce reliably). retrieval_tool writes here on every search;
+# RAG Baseline writes here explicitly before calling summarize_evidence.
+#
+# A module-level list is used (not ContextVar) because LangGraph runs each
+# tool call in its own context, which defeats ContextVar isolation. Gradio
+# serializes requests by default, so a global is safe for single-process
+# demo and benchmark usage.
+
+_last_evidence: list = []
+
+
+def set_last_chunks(chunks: list) -> None:
+    """Store the most recent retrieval result for summarize_evidence to consume."""
+    global _last_evidence
+    _last_evidence = list(chunks) if chunks else []
+
+
+def get_last_chunks() -> list:
+    return _last_evidence
+
+
+# ---------------------------------------------------------------------------
 # Prompt builder
 # ---------------------------------------------------------------------------
 
 def _build_prompt(question: str, chunks: list[dict]) -> str:
     evidence_lines = []
     for i, chunk in enumerate(chunks[:MAX_EVIDENCE_IN_PROMPT], 1):
+        if not isinstance(chunk, dict):
+            continue
         stars  = chunk.get("stars", "?")
-        text   = chunk.get("chunk_text", chunk.get("text", ""))[:MAX_CHUNK_CHARS]
-        biz_id = chunk.get("business_id", "unknown")[:12]
+        text   = str(chunk.get("chunk_text", chunk.get("text", "")))[:MAX_CHUNK_CHARS]
+        biz_id = str(chunk.get("business_id", "unknown"))[:12]
         evidence_lines.append(f"[{i}] ({stars}★, biz:{biz_id}…)\n{text}")
     evidence_block = "\n\n".join(evidence_lines)
 
@@ -143,17 +171,17 @@ def _parse_response(raw: str) -> dict:
 # ---------------------------------------------------------------------------
 
 @tool
-def summarize_evidence(question: str, evidence_chunks: list) -> dict:
+def summarize_evidence(question: str) -> dict:
     """
-    Synthesise a list of retrieved Yelp review chunks into a structured
-    analytical answer using the active LLM backend.
+    Synthesise the most recently retrieved Yelp review chunks into a
+    structured analytical answer.
 
-    This tool does NOT search the database — it only analyses the evidence
-    passed to it. Always call a retrieval tool first, then pass results here.
+    IMPORTANT: Always call one of the search_review_chunks_* tools FIRST.
+    This tool automatically uses the chunks from the most recent search —
+    do NOT try to pass evidence_chunks; just provide the question.
 
     Args:
-        question:        The original user question.
-        evidence_chunks: List of chunk dicts from search_review_chunks_* tools.
+        question: The original user question.
 
     Returns:
         Dict with keys: main_findings, supporting_evidence, uncertainties.
@@ -163,9 +191,10 @@ def summarize_evidence(question: str, evidence_chunks: list) -> dict:
             "LLM backend not initialised. "
             "Call set_backend() before using summarize_evidence."
         )
+    evidence_chunks = get_last_chunks()
     if not evidence_chunks:
         return {
-            "main_findings"      : ["No evidence provided."],
+            "main_findings"      : ["No evidence available. Call a search_review_chunks_* tool before summarize_evidence."],
             "supporting_evidence": [],
             "uncertainties"      : [],
         }

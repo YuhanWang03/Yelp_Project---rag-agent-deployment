@@ -14,10 +14,14 @@ import yaml
 from yelp_rag_agent.backends.base import BaseBackend
 from yelp_rag_agent.backends.ollama import OllamaBackend
 from yelp_rag_agent.backends.lmdeploy import LMDeployBackend
+from yelp_rag_agent.backends.hf_inference import HFInferenceBackend
+from yelp_rag_agent.backends.groq import GroqBackend
 
 _REGISTRY: dict[str, type[BaseBackend]] = {
-    "ollama"   : OllamaBackend,
-    "lmdeploy" : LMDeployBackend,
+    "ollama"       : OllamaBackend,
+    "lmdeploy"     : LMDeployBackend,
+    "hf_inference" : HFInferenceBackend,
+    "groq"         : GroqBackend,
 }
 
 
@@ -53,4 +57,5 @@ def load_backend(config_path: str,
     return cls.from_config(cfg)
 
 
-__all__ = ["load_backend", "BaseBackend", "OllamaBackend", "LMDeployBackend"]
+__all__ = ["load_backend", "BaseBackend", "OllamaBackend", "LMDeployBackend",
+           "HFInferenceBackend", "GroqBackend"]

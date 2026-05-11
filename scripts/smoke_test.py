@@ -120,15 +120,18 @@ def main():
     # 3. Retrieval tool (no LLM needed)
     # ------------------------------------------------------------------
     def test_global_search():
+        import json as _json
         from yelp_rag_agent.tools.retrieval_tool import search_review_chunks_global
-        results = search_review_chunks_global.invoke(
+        raw = search_review_chunks_global.invoke(
             {"query": "rude staff terrible service", "top_k": 3}
         )
+        results = _json.loads(raw) if isinstance(raw, str) else raw
         assert len(results) == 3, f"Expected 3 results, got {len(results)}"
         assert "chunk_text" in results[0], "Missing 'chunk_text' key"
         assert "similarity" in results[0], "Missing 'similarity' key"
 
     def test_business_search():
+        import json as _json
         from yelp_rag_agent.tools.retrieval_tool import (
             search_review_chunks_by_business,
             _load_store,
@@ -139,9 +142,10 @@ def main():
             bid for bid, idxs in store["business_to_indices"].items()
             if len(idxs) > 5
         )
-        results = search_review_chunks_by_business.invoke(
+        raw = search_review_chunks_by_business.invoke(
             {"business_id": sample_biz, "query": "food quality", "top_k": 3}
         )
+        results = _json.loads(raw) if isinstance(raw, str) else raw
         assert len(results) >= 1, "Expected at least 1 result"
         assert results[0]["business_id"] == sample_biz, "Wrong business returned"
 
@@ -187,8 +191,19 @@ def main():
         b = load_backend("configs/ollama.yaml", overrides={"model": "qwen2.5:14b"})
         assert b.model == "qwen2.5:14b", "Override not applied"
 
+    def test_backend_factory_groq():
+        import os
+        from yelp_rag_agent.backends import load_backend
+        from yelp_rag_agent.backends.groq import GroqBackend
+        # Inject a dummy key so construction succeeds even without env var
+        b = load_backend("configs/groq.yaml",
+                         overrides={"api_key": os.environ.get("GROQ_API_KEY", "dummy")})
+        assert isinstance(b, GroqBackend)
+        assert b.model == "llama-3.1-8b-instant"
+
     check("Backend: load OllamaBackend from YAML",   test_backend_factory_ollama)
     check("Backend: load LMDeployBackend from YAML", test_backend_factory_lmdeploy)
+    check("Backend: load GroqBackend from YAML",     test_backend_factory_groq)
     check("Backend: CLI override applied",           test_backend_override)
 
     # ------------------------------------------------------------------
@@ -197,10 +212,11 @@ def main():
     def test_summarizer_no_backend():
         from yelp_rag_agent.tools import summarizer_tool
         summarizer_tool._backend = None   # force unset
+        summarizer_tool.set_last_chunks(
+            [{"chunk_text": "x", "stars": 3, "business_id": "TEST"}]
+        )
         try:
-            summarizer_tool.summarize_evidence.invoke(
-                {"question": "test", "evidence_chunks": [{"chunk_text": "x", "stars": 3}]}
-            )
+            summarizer_tool.summarize_evidence.invoke({"question": "test"})
             raise AssertionError("Should have raised RuntimeError")
         except RuntimeError:
             pass   # expected
@@ -219,16 +235,16 @@ def main():
 
     def test_summarize_with_backend():
         from yelp_rag_agent.backends import load_backend
-        from yelp_rag_agent.tools.summarizer_tool import set_backend, summarize_evidence
+        from yelp_rag_agent.tools.summarizer_tool import (
+            set_backend, set_last_chunks, summarize_evidence,
+        )
         b = load_backend(args.config)
         set_backend(b)
-        result = summarize_evidence.invoke({
-            "question": "What do customers complain about?",
-            "evidence_chunks": [
-                {"chunk_text": "The wait was terrible and staff were rude.",
-                 "stars": 1, "business_id": "TEST001"},
-            ]
-        })
+        set_last_chunks([
+            {"chunk_text": "The wait was terrible and staff were rude.",
+             "stars": 1, "business_id": "TEST001"},
+        ])
+        result = summarize_evidence.invoke({"question": "What do customers complain about?"})
         assert "main_findings" in result, "Missing 'main_findings'"
         assert len(result["main_findings"]) > 0, "main_findings is empty"
 

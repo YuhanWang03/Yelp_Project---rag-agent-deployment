@@ -30,6 +30,7 @@ Return schema:
     }
 """
 
+import json
 import time
 from typing import Optional
 
@@ -39,7 +40,21 @@ from yelp_rag_agent.tools.retrieval_tool import (
     search_review_chunks_by_business,
 )
 from yelp_rag_agent.tools.stats_tool import get_business_stats
-from yelp_rag_agent.tools.summarizer_tool import summarize_evidence
+from yelp_rag_agent.tools.summarizer_tool import summarize_evidence, set_last_chunks
+
+
+def _parse_chunks(raw) -> list:
+    """Decode the search tools' JSON-string output back into a list of dicts."""
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, str):
+        s = raw.strip()
+        if s.startswith("["):
+            try:
+                return json.loads(s)
+            except json.JSONDecodeError:
+                pass
+    return []
 
 
 def _run_flow_a(question: str, business_id: str, top_k: int) -> dict:
@@ -62,15 +77,14 @@ def _run_flow_a(question: str, business_id: str, top_k: int) -> dict:
         }
 
     print(f"  [Flow A / Step 2] search_review_chunks_by_business('{question[:50]}…')")
-    chunks = search_review_chunks_by_business.invoke(
+    chunks = _parse_chunks(search_review_chunks_by_business.invoke(
         {"business_id": business_id, "query": question, "top_k": top_k}
-    )
+    ))
     tools_called.append("search_review_chunks_by_business")
 
     print(f"  [Flow A / Step 3] summarize_evidence ({len(chunks)} chunks) …")
-    synthesis = summarize_evidence.invoke(
-        {"question": question, "evidence_chunks": chunks}
-    )
+    set_last_chunks(chunks)
+    synthesis = summarize_evidence.invoke({"question": question})
     tools_called.append("summarize_evidence")
 
     return {
@@ -85,13 +99,14 @@ def _run_flow_b(question: str, top_k: int) -> dict:
     tools_called: list[str] = []
 
     print(f"  [Flow B / Step 1] search_review_chunks_global('{question[:50]}…')")
-    chunks = search_review_chunks_global.invoke({"query": question, "top_k": top_k})
+    chunks = _parse_chunks(
+        search_review_chunks_global.invoke({"query": question, "top_k": top_k})
+    )
     tools_called.append("search_review_chunks_global")
 
     print(f"  [Flow B / Step 2] summarize_evidence ({len(chunks)} chunks) …")
-    synthesis = summarize_evidence.invoke(
-        {"question": question, "evidence_chunks": chunks}
-    )
+    set_last_chunks(chunks)
+    synthesis = summarize_evidence.invoke({"question": question})
     tools_called.append("summarize_evidence")
 
     return {

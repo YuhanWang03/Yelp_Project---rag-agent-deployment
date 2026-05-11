@@ -14,6 +14,7 @@ Output format:
 }
 """
 
+import threading
 from typing import Optional
 
 import torch
@@ -22,6 +23,8 @@ from langchain.tools import tool
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from yelp_rag_agent.config import CLASSIFIER_DIR
+
+_load_lock = threading.Lock()
 
 _MAX_LENGTH = 512
 
@@ -37,21 +40,24 @@ _device: Optional[str] = None
 def _load_model():
     global _tokenizer, _model, _device
 
-    if _model is None:
-        if not CLASSIFIER_DIR.exists():
-            raise FileNotFoundError(
-                f"Classifier not found at {CLASSIFIER_DIR}. "
-                "Run artifacts/step0_train_and_save.py first."
+    if _model is not None:
+        return _tokenizer, _model, _device
+    with _load_lock:
+        if _model is None:
+            if not CLASSIFIER_DIR.exists():
+                raise FileNotFoundError(
+                    f"Classifier not found at {CLASSIFIER_DIR}. "
+                    "Run artifacts/step0_train_and_save.py first."
+                )
+            print(f"[classifier_tool] Loading RoBERTa from {CLASSIFIER_DIR} …")
+            _tokenizer = AutoTokenizer.from_pretrained(str(CLASSIFIER_DIR))
+            _model     = AutoModelForSequenceClassification.from_pretrained(
+                str(CLASSIFIER_DIR)
             )
-        print(f"[classifier_tool] Loading RoBERTa from {CLASSIFIER_DIR} …")
-        _tokenizer = AutoTokenizer.from_pretrained(str(CLASSIFIER_DIR))
-        _model     = AutoModelForSequenceClassification.from_pretrained(
-            str(CLASSIFIER_DIR)
-        )
-        _device = "cuda" if torch.cuda.is_available() else "cpu"
-        _model  = _model.to(_device)
-        _model.eval()
-        print(f"[classifier_tool] Model ready on {_device.upper()}")
+            _device = "cuda" if torch.cuda.is_available() else "cpu"
+            _model  = _model.to(_device)
+            _model.eval()
+            print(f"[classifier_tool] Model ready on {_device.upper()}")
 
     return _tokenizer, _model, _device
 

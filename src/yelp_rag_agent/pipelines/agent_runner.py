@@ -37,24 +37,22 @@ from yelp_rag_agent.tools.retrieval_tool import (
     search_review_chunks_by_business,
 )
 from yelp_rag_agent.tools.stats_tool import get_business_stats
-from yelp_rag_agent.tools.classifier_tool import classify_review
-from yelp_rag_agent.tools.summarizer_tool import summarize_evidence
 
 SYSTEM_PROMPT = """You are a Yelp Business Intelligence Agent with access to a \
 database of 50,000 real Yelp reviews.
 
 You have the following tools:
-- search_review_chunks_global: search all reviews semantically
-- search_review_chunks_by_business: search reviews for a specific business
-- get_business_stats: get star distribution for a specific business
-- classify_review: predict star rating for a piece of text using a fine-tuned model
-- summarize_evidence: synthesise retrieved review chunks into a structured answer
+- search_review_chunks_global(query, top_k): search all reviews semantically
+- search_review_chunks_by_business(business_id, query, top_k): search reviews for a specific business
+- get_business_stats(business_id): get star distribution for a specific business
 
 Guidelines:
 1. If a business_id is mentioned in the question, use the business-specific tools.
-2. Always retrieve evidence BEFORE calling summarize_evidence.
-3. Call summarize_evidence as your LAST step to produce the final structured answer.
-4. Use classify_review when you want to verify the sentiment of a specific text snippet.
+2. When calling a search_review_chunks_* tool, use top_k=5 to keep responses concise.
+3. The search results already include the star rating of each chunk — you do not need to classify anything separately.
+4. After retrieving evidence, synthesize the final answer DIRECTLY in your reply using the retrieved chunks.
+   Do NOT make extra tool calls just to summarize — write the answer yourself in 3–5 bullet points,
+   citing specific quotes or paraphrases from the chunks where appropriate.
 5. Be concise in tool inputs — avoid repeating the full question verbatim.
 """
 
@@ -84,6 +82,26 @@ def _make_chat_model():
             temperature=0,
         )
 
+    from yelp_rag_agent.backends.hf_inference import HFInferenceBackend
+    if isinstance(_backend, HFInferenceBackend):
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            base_url=_backend._base_url,
+            api_key=_backend.token or "none",
+            model=_backend.model,
+            temperature=0,
+        )
+
+    from yelp_rag_agent.backends.groq import GroqBackend
+    if isinstance(_backend, GroqBackend):
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            base_url=_backend.base_url,
+            api_key=_backend.api_key,
+            model=_backend.model,
+            temperature=0,
+        )
+
     raise RuntimeError(f"Unsupported backend type for agent: {type(_backend).__name__}")
 
 
@@ -97,13 +115,18 @@ def _get_agent():
             search_review_chunks_global,
             search_review_chunks_by_business,
             get_business_stats,
-            classify_review,
-            summarize_evidence,
         ]
         _agent = create_react_agent(llm, tools)
         _agent_backend = _backend
         print("[agent_runner] Agent ready.")
     return _agent
+
+
+def _safe_tc_field(tc, key, default=""):
+    """Read a field from a ToolCall that may be a dict, TypedDict, or object."""
+    if isinstance(tc, dict):
+        return tc.get(key, default)
+    return getattr(tc, key, default)
 
 
 def _extract_trace(messages: list) -> tuple[str, list[dict]]:
@@ -113,22 +136,28 @@ def _extract_trace(messages: list) -> tuple[str, list[dict]]:
     tool_msg_map: dict[str, str] = {}
     for msg in messages:
         if isinstance(msg, ToolMessage):
-            content = str(msg.content)
-            tool_msg_map[msg.tool_call_id] = (
-                content[:600] + " …[truncated]" if len(content) > 600 else content
-            )
+            tool_msg_map[str(getattr(msg, "tool_call_id", ""))] = str(msg.content)
 
     for msg in messages:
-        if isinstance(msg, AIMessage):
-            if msg.tool_calls:
-                for tc in msg.tool_calls:
-                    tool_calls.append({
-                        "tool"  : tc["name"],
-                        "input" : str(tc["args"]),
-                        "output": tool_msg_map.get(tc["id"], "(no output)"),
-                    })
-            elif msg.content:
-                final_answer = msg.content
+        if not isinstance(msg, AIMessage):
+            continue
+        raw_tcs = getattr(msg, "tool_calls", None) or []
+        for tc in raw_tcs:
+            try:
+                name   = _safe_tc_field(tc, "name", "")
+                args   = _safe_tc_field(tc, "args", {})
+                tc_id  = str(_safe_tc_field(tc, "id", ""))
+                if not name:
+                    continue
+                tool_calls.append({
+                    "tool"  : str(name),
+                    "input" : str(args),
+                    "output": tool_msg_map.get(tc_id, "(no output)"),
+                })
+            except Exception:
+                continue
+        if not raw_tcs and msg.content:
+            final_answer = msg.content
 
     return final_answer, tool_calls
 
@@ -153,16 +182,27 @@ def run_agent(
 
     agent = _get_agent()
 
+    inputs = {
+        "messages": [
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=full_question),
+        ]
+    }
+    invoke_config = {"recursion_limit": max_iterations * 2}
+
     t0 = time.time()
-    result = agent.invoke(
-        {
-            "messages": [
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(content=full_question),
-            ]
-        },
-        config={"recursion_limit": max_iterations * 2},
-    )
+    last_exc = None
+    result = None
+    for attempt in range(2):
+        try:
+            result = agent.invoke(inputs, config=invoke_config)
+            break
+        except Exception as e:
+            last_exc = e
+            print(f"  [agent invoke attempt {attempt + 1} failed: {type(e).__name__}: {e}]")
+            time.sleep(0.5)
+    if result is None:
+        raise last_exc if last_exc else RuntimeError("agent.invoke produced no result")
     elapsed = round(time.time() - t0, 2)
 
     messages = result["messages"]

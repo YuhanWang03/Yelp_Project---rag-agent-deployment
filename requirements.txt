@@ -2,6 +2,7 @@
 gradio>=4.0.0
 langchain
 langchain-core
+langchain-openai
 langchain-ollama
 langgraph
 sentence-transformers
@@ -12,6 +13,7 @@ numpy
 pandas
 requests
 pyyaml
+huggingface_hub
 
 # Notebook / analysis (Stage D)
 matplotlib

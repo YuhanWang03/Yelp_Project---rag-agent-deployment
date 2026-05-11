@@ -13,12 +13,15 @@ Output format:
 }
 """
 
+import threading
 from typing import Optional
 
 import pandas as pd
 from langchain.tools import tool
 
 from yelp_rag_agent.config import DATA_PATH
+
+_load_lock = threading.Lock()
 
 # ---------------------------------------------------------------------------
 # Lazy singleton
@@ -29,12 +32,15 @@ _df: Optional[pd.DataFrame] = None
 
 def _load_df() -> pd.DataFrame:
     global _df
-    if _df is None:
-        print("[stats_tool] Loading review dataset …")
-        _df = pd.read_csv(DATA_PATH, usecols=["review_id", "business_id", "stars"])
-        _df["stars"] = _df["stars"].astype(float)
-        print(f"[stats_tool] Loaded {len(_df):,} reviews, "
-              f"{_df['business_id'].nunique():,} unique businesses")
+    if _df is not None:
+        return _df
+    with _load_lock:
+        if _df is None:
+            print("[stats_tool] Loading review dataset …")
+            _df = pd.read_csv(DATA_PATH, usecols=["review_id", "business_id", "stars"])
+            _df["stars"] = _df["stars"].astype(float)
+            print(f"[stats_tool] Loaded {len(_df):,} reviews, "
+                  f"{_df['business_id'].nunique():,} unique businesses")
     return _df
 
 

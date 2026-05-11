@@ -37,3 +37,18 @@ Thumbs.db
 
 # Secrets
 .env
+.hf_token
+
+# Claude Code internal state
+.claude/
+
+# Personal / Chinese-only docs (not meant for public repo)
+Final_Project_Summary_zh.pdf
+Yelp_RAG_Agent_Deployment_Plan_CN.docx
+Yelp_RAG_Agent_Deployment_Updated_Outline_CN.docx
+
+# Legacy single-folder version (pre-refactor); kept locally only
+s4_agent/
+
+# Binary chart images — HF Hub requires LFS for these; keep locally only
+docs/*.png
