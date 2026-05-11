@@ -18,7 +18,14 @@ import ast
 import json
 import os
 import pickle
+import sys
 import time
+
+# Make the src-layout package importable without requiring `pip install -e .`.
+# This lets the HF Space run app.py directly with just requirements.txt.
+_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
 
 
 def _parse_tool_output(raw):
