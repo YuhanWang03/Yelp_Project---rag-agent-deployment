@@ -8,9 +8,11 @@ Inference）。
 > **🚀 在线 Demo：** https://huggingface.co/spaces/YUHAN03/yelp-rag-agent
 > *（使用 Groq Llama 3.1 8B Instant，免费、免注册）*
 
-> **📄 详细报告：** 见 `docs/project_overview_zh.html`（或导出的
-> `docs/Project_Report_zh.pdf`），含项目概览、架构、A100 部署研究、
-> Full Agent parser bug 修复故事等完整内容。
+> **📄 详细报告 PDF：**
+> [Project_Report_zh.pdf（中文）](https://github.com/YuhanWang03/Yelp_Project---rag-agent-deployment/releases/download/v1.0/Project_Report_zh.pdf)
+> · [Project_Report.pdf (EN)](https://github.com/YuhanWang03/Yelp_Project---rag-agent-deployment/releases/download/v1.0/Project_Report.pdf)
+> &mdash; 包含项目概览、架构、A100 部署研究、Full Agent parser bug 修复故事
+> 等完整内容。原始 HTML 在 `docs/project_overview_zh.html`。
 
 ---
 
@@ -127,4 +129,5 @@ yelp-rag-agent-deployment/
 4. **JSON 字符串化工具输出**：绕开 Groq API 对空 list `ToolMessage.content`
    的严格校验拒收。
 
-详见 `docs/project_overview_zh.html`（或导出的 `docs/Project_Report_zh.pdf`）。
+详见 `docs/project_overview_zh.html`，或访问 GitHub Releases 下载
+[Project_Report PDF](https://github.com/YuhanWang03/Yelp_Project---rag-agent-deployment/releases/latest)。
