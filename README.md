@@ -20,8 +20,9 @@ backends (Ollama · LMDeploy · Groq · HF Inference).
 > **🚀 Live demo:** https://huggingface.co/spaces/YUHAN03/yelp-rag-agent
 > *(runs free on Groq Llama 3.1 8B Instant — no sign-up required)*
 
-> **📄 Full write-up:** see `docs/project_overview.html` (printable) and
-> `docs/benchmark_report.md` for the original A100 deployment study.
+> **📄 Full write-up:** see `docs/project_overview.html` (or the rendered
+> `docs/Project_Report.pdf`) for the project overview, architecture, A100
+> deployment study, and the Full Agent parser-bug recovery story.
 
 ---
 
@@ -127,7 +128,7 @@ yelp-rag-agent-deployment/
 ├── configs/             # ollama / lmdeploy / groq / hf_spaces YAMLs
 ├── notebooks/           # colab_awq_deploy · colab_quality_eval · benchmark_analysis
 ├── scripts/             # serve_lmdeploy.sh · smoke_test.py · upload_to_hf.py
-├── docs/                # project_overview.html · benchmark_report.md · charts
+├── docs/                # project_overview.html (EN + ZH) + exported PDFs
 └── app.py               # Gradio demo (auto-detects HF Spaces)
 ```
 
@@ -146,5 +147,5 @@ yelp-rag-agent-deployment/
 4. **JSON-string tool outputs** — works around Groq's strict schema that
    rejects empty-list `ToolMessage.content`.
 
-See `docs/project_overview.html` (or `docs/benchmark_report.md`) for the full
+See `docs/project_overview.html` (or `docs/Project_Report.pdf`) for the full
 write-up and engineering rationale.

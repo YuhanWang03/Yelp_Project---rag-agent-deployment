@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <title>Yelp Business Intelligence Agent — Project Overview</title>
 <style>
-  @page { size: A4; margin: 18mm 16mm; }
+  /* Single tall page so the PDF flows continuously with no page breaks.
+     If the bottom has white space, lower 2100mm; if content gets cut off,
+     raise it. The content height is ~1900-2100mm at line-height 1.55. */
+  @page { size: 210mm 1400mm; margin: 18mm 16mm; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                  "Helvetica Neue", Arial, sans-serif;
@@ -130,8 +133,8 @@
   }
   @media print {
     body { margin: 0; }
-    h2 { page-break-after: avoid; }
-    table, pre, .callout { page-break-inside: avoid; }
+    /* On a single tall page we don't need pagination hints; everything stays
+       on one continuous canvas. */
   }
 </style>
 </head>
@@ -389,7 +392,7 @@
 ├── configs/             # ollama.yaml · lmdeploy.yaml · groq.yaml · hf_spaces.yaml
 ├── notebooks/           # colab_awq_deploy · colab_quality_eval · benchmark_analysis
 ├── scripts/             # serve_lmdeploy.sh · smoke_test.py · upload_to_hf.py
-├── docs/                # benchmark_report.md + PNG charts
+├── docs/                # project_overview.html (EN + ZH) + exported PDFs
 └── app.py               # Gradio demo (auto-detects HF Spaces)</pre>
 
 <h2>6.5 Architectural Foresight</h2>

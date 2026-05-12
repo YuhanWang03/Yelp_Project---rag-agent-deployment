@@ -8,8 +8,9 @@ Inference）。
 > **🚀 在线 Demo：** https://huggingface.co/spaces/YUHAN03/yelp-rag-agent
 > *（使用 Groq Llama 3.1 8B Instant，免费、免注册）*
 
-> **📄 详细报告：** 见 `docs/project_overview_zh.html`（可打印为 PDF）
-> 以及 `docs/benchmark_report.md`（A100 部署研究原始报告）
+> **📄 详细报告：** 见 `docs/project_overview_zh.html`（或导出的
+> `docs/Project_Report_zh.pdf`），含项目概览、架构、A100 部署研究、
+> Full Agent parser bug 修复故事等完整内容。
 
 ---
 
@@ -109,7 +110,7 @@ yelp-rag-agent-deployment/
 ├── configs/             # ollama / lmdeploy / groq / hf_spaces 各 YAML
 ├── notebooks/           # colab_awq_deploy · colab_quality_eval · benchmark_analysis
 ├── scripts/             # serve_lmdeploy.sh · smoke_test.py · upload_to_hf.py
-├── docs/                # project_overview · benchmark_report · 图表
+├── docs/                # project_overview.html（中英）+ 导出的 PDF
 └── app.py               # Gradio 演示页（自动识别 HF Spaces 环境）
 ```
 
@@ -126,4 +127,4 @@ yelp-rag-agent-deployment/
 4. **JSON 字符串化工具输出**：绕开 Groq API 对空 list `ToolMessage.content`
    的严格校验拒收。
 
-详见 `docs/project_overview_zh.html`（或英文版 `docs/benchmark_report.md`）。
+详见 `docs/project_overview_zh.html`（或导出的 `docs/Project_Report_zh.pdf`）。

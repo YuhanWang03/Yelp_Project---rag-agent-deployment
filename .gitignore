@@ -38,6 +38,7 @@ Thumbs.db
 # Secrets
 .env
 .hf_token
+.groq_token
 
 # Claude Code internal state
 .claude/
@@ -50,5 +51,6 @@ Yelp_RAG_Agent_Deployment_Updated_Outline_CN.docx
 # Legacy single-folder version (pre-refactor); kept locally only
 s4_agent/
 
-# Binary chart images — HF Hub requires LFS for these; keep locally only
+# Binary chart images / PDFs — HF Hub requires LFS for these; keep locally only
 docs/*.png
+docs/*.pdf

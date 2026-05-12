@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <title>Yelp 商家智能问答 Agent — 项目说明</title>
 <style>
-  @page { size: A4; margin: 18mm 16mm; }
+  /* 单张长纸张，让 PDF 内容连续呈现、不分页。
+     如果下方仍有大段空白，把 2400mm 调小；如果内容被截掉，调大。
+     中文版行高 1.7，整体内容高度约 2200-2400mm。 */
+  @page { size: 210mm 1300mm; margin: 18mm 16mm; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
                  "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
@@ -125,8 +128,7 @@
   }
   @media print {
     body { margin: 0; }
-    h2 { page-break-after: avoid; }
-    table, pre, .callout { page-break-inside: avoid; }
+    /* 单张长纸张下不需要分页约束。 */
   }
 </style>
 </head>
@@ -366,7 +368,7 @@
 ├── configs/             # ollama.yaml · lmdeploy.yaml · groq.yaml · hf_spaces.yaml
 ├── notebooks/           # colab_awq_deploy · colab_quality_eval · benchmark_analysis
 ├── scripts/             # serve_lmdeploy.sh · smoke_test.py · upload_to_hf.py
-├── docs/                # benchmark_report.md + PNG 图表
+├── docs/                # project_overview.html（中英）+ 导出的 PDF
 └── app.py               # Gradio 演示页（自动识别 HF Spaces 环境）</pre>
 
 <h2>6.5 架构远见</h2>
