@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Yelp 商家智能问答 Agent — 项目说明</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+                 "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+    line-height: 1.7;
+    color: #1f2937;
+    max-width: 820px;
+    margin: 30px auto;
+    padding: 0 24px;
+    font-size: 11pt;
+  }
+  h1 {
+    font-size: 26pt;
+    margin: 0 0 4px;
+    color: #111827;
+    border-bottom: 3px solid #dc2626;
+    padding-bottom: 8px;
+  }
+  h1 .emoji { color: #dc2626; }
+  .subtitle {
+    color: #6b7280;
+    font-size: 11pt;
+    margin: 0 0 18px;
+    letter-spacing: 0.02em;
+  }
+  h2 {
+    font-size: 16pt;
+    color: #b91c1c;
+    margin-top: 28px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  h3 {
+    font-size: 12pt;
+    color: #1f2937;
+    margin: 16px 0 6px;
+  }
+  p { margin: 6px 0 10px; }
+  code, .mono {
+    font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    background: #f3f4f6;
+    color: #111827;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9.5pt;
+  }
+  pre {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-left: 3px solid #dc2626;
+    padding: 10px 14px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 9pt;
+    line-height: 1.55;
+  }
+  ul, ol { margin: 6px 0 12px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 10pt;
+  }
+  th, td {
+    padding: 7px 9px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 2px solid #d1d5db;
+  }
+  tr:nth-child(even) td { background: #fafafa; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .highlight { color: #b91c1c; font-weight: 600; }
+  .callout {
+    background: #fef2f2;
+    border-left: 3px solid #dc2626;
+    padding: 10px 14px;
+    border-radius: 0 4px 4px 0;
+    margin: 12px 0;
+    font-size: 10.5pt;
+  }
+  .meta-block {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 12px 0 18px;
+    font-size: 10pt;
+  }
+  .meta-block strong { color: #b91c1c; }
+  a { color: #1d4ed8; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 8.5pt;
+    font-weight: 600;
+    margin-right: 4px;
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+  .badge.blue   { background: #dbeafe; color: #1e40af; }
+  .badge.green  { background: #d1fae5; color: #065f46; }
+  .badge.purple { background: #ede9fe; color: #5b21b6; }
+  footer {
+    margin-top: 36px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 9pt;
+    color: #6b7280;
+    text-align: center;
+  }
+  @media print {
+    body { margin: 0; }
+    h2 { page-break-after: avoid; }
+    table, pre, .callout { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1><span class="emoji">🍽️</span> Yelp 商家智能问答 Agent</h1>
+<p class="subtitle">
+  基于 RAG 的领域问答系统：三种架构 × 多种部署后端的对比研究 &middot;
+  2026 年 4 月 – 5 月
+</p>
+
+<div class="meta-block">
+  <strong>在线 Demo：</strong>
+  <a href="https://huggingface.co/spaces/YUHAN03/yelp-rag-agent">
+    huggingface.co/spaces/YUHAN03/yelp-rag-agent
+  </a><br>
+  <strong>技术栈：</strong>
+  <span class="badge blue">FAISS</span>
+  <span class="badge blue">sentence-transformers</span>
+  <span class="badge purple">LangGraph ReAct</span>
+  <span class="badge purple">LangChain</span>
+  <span class="badge green">Gradio 5</span>
+  <span class="badge">Qwen2.5-7B（研究）</span>
+  <span class="badge">Llama 3.1 8B / Groq（Demo）</span><br>
+  <strong>数据规模：</strong>
+  60,823 条评论 chunk &middot; 50,000 条原始评论 &middot; 160 家商家
+</div>
+
+<h2>1. 项目目标</h2>
+<p>
+  在 Yelp 评论领域构建问答系统，并严肃地回答两个工程问题：
+</p>
+<ol>
+  <li>
+    <strong>质量问题：</strong>纯 LLM、固定 RAG 流水线、自主 Agent 三种架构里，
+    哪种在领域问答中表现最好？
+  </li>
+  <li>
+    <strong>部署问题：</strong>在单卡 A100 80GB 上，<code>AWQ</code>（W4A16 量化）
+    通过 LMDeploy 部署相比 <code>fp16</code> baseline 能提速多少？质量是否退步？
+  </li>
+</ol>
+
+<h2>2. 系统架构</h2>
+<pre>用户问题
+   │
+   ├─► Direct LLM        ── Qwen2.5-7B / Llama 3.1，仅依赖参数化记忆
+   │
+   ├─► RAG Baseline      ── Stats → FAISS 检索 → 结构化合成
+   │
+   └─► Full Agent        ── LangGraph ReAct：LLM 自主调度 search / stats /
+                            classifier 等工具</pre>
+
+<h3>2.1 检索栈</h3>
+<ul>
+  <li>
+    <strong>Chunk 级 FAISS 索引</strong>（IndexFlatIP），共 60,823 条 chunk。
+    评论按 180 词、句边界感知地切分；embedding 经 L2 归一化，
+    使内积等价于余弦相似度。
+  </li>
+  <li>
+    <strong>商家预过滤检索</strong>：维护 <code>business_to_indices</code> 映射，
+    直接在目标商家的 embedding 子集上算相似度，避免"全局 Top-K + 后过滤"
+    对低评论量商家失效的反模式。
+  </li>
+  <li>
+    Embedding 模型：<code>sentence-transformers/all-MiniLM-L6-v2</code>（384 维）。
+  </li>
+</ul>
+
+<h3>2.2 后端抽象层（核心工程思路）</h3>
+<p>
+  所有 pipeline 只依赖 <code>BaseBackend</code> 接口的一个方法
+  <code>generate(prompt, temperature, max_tokens) -&gt; str</code>。
+  四个具体后端通过 YAML 配置即可互换：
+</p>
+<table>
+  <tr><th>后端</th><th>用途</th><th>调用端点</th></tr>
+  <tr><td><code>OllamaBackend</code></td>     <td>本地开发</td>                <td><code>localhost:11434</code></td></tr>
+  <tr><td><code>LMDeployBackend</code></td>   <td>A100 部署研究</td>           <td><code>OpenAI 兼容 HTTP</code></td></tr>
+  <tr><td><code>GroqBackend</code></td>       <td>HF Spaces 在线 demo（现役）</td><td><code>api.groq.com/openai/v1</code></td></tr>
+  <tr><td><code>HFInferenceBackend</code></td><td>备用 serverless 方案</td>     <td><code>api-inference.huggingface.co</code></td></tr>
+</table>
+<p>
+  切换后端<em>不需要改任何应用层代码</em> &mdash; 只需 CLI 参数
+  （<code>--config configs/groq.yaml</code>）或 HF Space 上的一条 secret。
+</p>
+
+<h2>3. 研究结果 — A100 部署研究（Qwen2.5-7B）</h2>
+
+<h3>3.1 部署性能</h3>
+<p>在冷启动的 NVIDIA A100 80GB GPU 上，通过 LMDeploy 0.7.x 测量。</p>
+<table>
+  <tr>
+    <th>指标</th>
+    <th class="num">fp16 (pytorch)</th>
+    <th class="num">AWQ (turbomind)</th>
+    <th class="num">AWQ 相对优势</th>
+  </tr>
+  <tr><td>TTFT（首 token 时延）（毫秒）</td><td class="num">693.6</td><td class="num"><strong>18.0</strong></td><td class="num highlight">38.5× 更快</td></tr>
+  <tr><td>吞吐（tokens/秒）</td>           <td class="num">73.9</td> <td class="num"><strong>166.9</strong></td><td class="num highlight">2.26× 更高</td></tr>
+  <tr><td>平均响应时间（秒）</td>            <td class="num">2.00</td> <td class="num"><strong>0.91</strong></td><td class="num highlight">2.20× 更快</td></tr>
+  <tr><td>VRAM 峰值（GB）</td>             <td class="num">64.55</td><td class="num">65.30</td><td class="num">基本持平*</td></tr>
+</table>
+<p style="font-size: 9pt; color: #6b7280;">
+  *VRAM 看起来基本一致，原因是 LMDeploy 的 turbomind 后端在启动时预分配了
+  一大块 KV-cache 缓冲区，占了总占用的大头。在显存受限的 GPU（如 T4 16GB）上，
+  AWQ 的 W4A16 权重压缩才会真正发挥优势。
+</p>
+
+<h3>3.2 答案质量（3 系统 × 20 题 · 人工 0–2 分 / 维度评分，单题满分 10）</h3>
+<table>
+  <tr>
+    <th>系统</th>
+    <th>后端</th>
+    <th class="num">正确性</th><th class="num">证据</th>
+    <th class="num">可溯源</th><th class="num">工具使用</th>
+    <th class="num">效率</th><th class="num">总分 /10</th>
+  </tr>
+  <tr>
+    <td>Direct LLM</td><td>A100 / Qwen</td>
+    <td class="num">0.20</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.95</td><td class="num">1.15</td>
+  </tr>
+  <tr>
+    <td><strong>RAG Baseline</strong></td><td>A100 / Qwen</td>
+    <td class="num"><strong>1.75</strong></td><td class="num"><strong>1.90</strong></td><td class="num"><strong>1.95</strong></td><td class="num"><strong>2.00</strong></td><td class="num"><strong>1.90</strong></td><td class="num highlight">9.50</td>
+  </tr>
+  <tr style="color:#9ca3af; text-decoration: line-through;">
+    <td>Full Agent</td><td>A100 / Qwen</td>
+    <td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">1.00</td><td class="num">0.00</td><td class="num">1.00</td>
+  </tr>
+  <tr>
+    <td><strong>Full Agent（修复后）</strong></td><td><strong>Groq / Llama 3.1 8B</strong></td>
+    <td class="num"><strong>1.80</strong></td><td class="num">1.30</td><td class="num">1.25</td><td class="num"><strong>1.85</strong></td><td class="num">1.40</td><td class="num highlight">7.60</td>
+  </tr>
+</table>
+<div class="callout">
+  <strong>Full Agent 的&ldquo;修复&rdquo;&mdash; 一次后端切换带来 7.6&times;
+  质量回升。</strong>上表中划掉的那一行来自原 A100 研究（Qwen2.5-7B），它输出
+  非标准的 <code>&lt;tool_call&gt;</code> XML 标签，LangChain 直接静默丢弃。
+  把 LLM 后端切换到 Groq 上的 Llama 3.1 8B Instant（输出标准
+  <code>tool_calls</code> JSON）后，Full Agent 总分从 1.00 跳到 7.60 / 10
+  &mdash; <strong>pipeline 和 tool 代码零修改</strong>，只新增了约 30 行
+  <code>GroqBackend</code> 封装类和一份 YAML 配置。20 题 Llama 评测里
+  <strong>幻觉率为 0%</strong>（没有一题 groundedness 为 0）。
+</div>
+<p style="font-size: 9.5pt;">
+  即使在修复后，Full Agent（7.60）在 Evidence（1.30 vs 1.90）和
+  Groundedness（1.25 vs 1.95）维度上仍略低于 RAG Baseline（9.50）。这一差距
+  来源于架构本身：RAG Baseline 的固定流水线强制走 <code>summarize_evidence</code>
+  步骤，输出结构化的 <em>claim + quote</em> 块；而 Full Agent 让 LLM 自由合成
+  答案 &mdash; 更自然但显式引用少一些。
+</p>
+
+<h2>4. 在线部署 — HF Spaces</h2>
+<p>
+  部署地址：
+  <a href="https://huggingface.co/spaces/YUHAN03/yelp-rag-agent">
+    huggingface.co/spaces/YUHAN03/yelp-rag-agent</a>，
+  使用 HF Spaces 免费 CPU tier（不需要 GPU，因为 LLM 推理交给 Groq）。
+</p>
+<table>
+  <tr><th>组件</th><th>存放位置</th></tr>
+  <tr><td>代码 &amp; Gradio 应用</td>      <td>HF Space 仓库（本项目，通过 git push 上传）</td></tr>
+  <tr><td>向量库 + 原始数据</td>            <td>HF Dataset <code>YUHAN03/yelp-rag-data</code></td></tr>
+  <tr><td>微调 RoBERTa 分类器</td>          <td>HF Model <code>YUHAN03/yelp-roberta-5class</code></td></tr>
+  <tr><td>LLM 推理（在线运行时）</td>        <td>Groq API &mdash; Llama 3.1 8B Instant，免费 tier</td></tr>
+</table>
+<p>
+  启动时 <code>app.py</code> 通过 <code>SPACE_ID</code> 环境变量识别 HF Spaces，
+  然后用 <code>huggingface_hub.snapshot_download</code> 把向量库和模型拉到容器，
+  最后初始化 Groq 后端。冷启动约 60–90 秒，热请求 &lt; 5 秒。
+</p>
+
+<h2>5. 工程挑战与解决方案</h2>
+
+<h3>5.1 Qwen2.5 tool-calling 兼容性问题（研究阶段发现）</h3>
+<p>
+  在 A100 研究中，Full Agent 系统得分接近 0，尽管模型正确识别出了要调用的工具。
+  根因：Qwen2.5-7B 输出 <code>&lt;tool_call&gt;...&lt;/tool_call&gt;</code>
+  XML 标签，而非 OpenAI 标准的 <code>tool_calls</code> JSON，LangChain 的
+  <code>ChatOpenAI</code> 客户端无法解析。<strong>这是框架集成限制，不是
+  模型能力限制</strong> &mdash; 在 benchmark 报告中有完整记录。
+</p>
+<div class="callout">
+  <strong>在线 Demo 的修复方案：</strong>把 LLM 后端切换到 Groq 上的 Llama
+  3.1 8B Instant，它输出标准 OpenAI <code>tool_calls</code>。这次切换<em>没有
+  改动任何 pipeline / tool 代码</em>，只新增了一个 <code>GroqBackend</code>
+  类（约 30 行）和一份 YAML 配置。这正是后端抽象层的工程价值兑现。
+</div>
+
+<h3>5.2 懒加载单例的多线程竞态</h3>
+<p>
+  HF 首次部署时报错
+  <code>AttributeError: 'NoneType' object has no attribute 'encode'</code>，
+  在 Full Agent 并行调用多个工具时触发。
+  根因：LangGraph 把 tool 调用派发到线程池；<code>_load_store()</code> 懒加载
+  函数不是线程安全的。三个线程同时调用
+  <code>SentenceTransformer(...).to('cuda')</code> 破坏了 PyTorch 内部 CUDA
+  状态，导致某些线程视角下 <code>_embed_model</code> 是 <code>None</code>。
+</p>
+<div class="callout">
+  <strong>修复：</strong>在所有懒加载路径
+  （<code>retrieval_tool</code> / <code>stats_tool</code> /
+  <code>classifier_tool</code>）加 <code>threading.Lock</code> + 双检锁。
+</div>
+
+<h3>5.3 Groq 对 tool 消息的严格 schema 校验</h3>
+<p>
+  Groq 的 chat completion API 会拒收 content 为空 list（<code>content: []</code>）
+  的 tool 消息，返回 HTTP 400。当 LLM 偶尔用错的 <code>business_id</code> 调用
+  <code>search_review_chunks_by_business</code> 时，工具返回 <code>[]</code>，
+  下一轮请求就被拒。
+</p>
+<div class="callout">
+  <strong>修复：</strong>检索工具改为返回 JSON 字符串（空结果时返回
+  <em>"No matching review chunks were found..."</em> 这种提示字符串）。
+  RAG Baseline 在自己侧把 JSON 字符串解析回 list。
+</div>
+
+<h3>5.4 Agent 工具集精简</h3>
+<p>
+  Llama 3.1 8B 偶尔会陷入循环或多余调用 <code>classify_review</code>。
+  务实修复：从 Agent 工具集移除 <code>summarize_evidence</code> 和
+  <code>classify_review</code>（检索结果本身已包含星级数据，无需再分类）。
+  最终 Agent 工具栈：<code>search_global</code>、
+  <code>search_by_business</code>、<code>get_business_stats</code>。
+</p>
+
+<h2>6. 代码结构</h2>
+<pre>yelp-rag-agent-deployment/
+├── src/yelp_rag_agent/
+│   ├── backends/        # BaseBackend + 4 个具体实现（ollama / lmdeploy / groq / hf_inference）
+│   ├── tools/           # 4 个 LangChain 工具（retrieval / stats / classifier / summarizer）
+│   ├── pipelines/       # rag_baseline.py · agent_runner.py（LangGraph ReAct）
+│   └── evaluation/      # run_eval.py · metrics.py · rubric.md · test_questions.json
+├── configs/             # ollama.yaml · lmdeploy.yaml · groq.yaml · hf_spaces.yaml
+├── notebooks/           # colab_awq_deploy · colab_quality_eval · benchmark_analysis
+├── scripts/             # serve_lmdeploy.sh · smoke_test.py · upload_to_hf.py
+├── docs/                # benchmark_report.md + PNG 图表
+└── app.py               # Gradio 演示页（自动识别 HF Spaces 环境）</pre>
+
+<h2>7. 核心结论</h2>
+<ul>
+  <li>
+    <strong>RAG 比 Direct LLM 高出 8 倍质量分</strong>，即使用 7B 小模型亦然
+    &mdash; 在领域问答中检索 grounding 才是质量的主导因素，而不是模型尺寸。
+  </li>
+  <li>
+    <strong>AWQ 在 A100 上相比 fp16 实现 38.5× 的 TTFT 降低 + 2.26× 的吞吐提升</strong>
+    且无可测的质量损失 &mdash; 单卡 A100 生产部署应默认使用 AWQ + turbomind。
+  </li>
+  <li>
+    <strong>后端抽象层在真实迁移中确实回本</strong>：把 LMDeploy/Qwen 切换到
+    Groq/Llama 做免费 serverless demo，只需约 30 行代码加 1 份 YAML。
+  </li>
+  <li>
+    <strong>框架集成 bug 和模型质量是两件事</strong>：&laquo;Agent 在 Qwen 上不工作&raquo;
+    是 parser 问题，不是推理问题。切换到 Groq 的 Llama 3.1 8B 后，Full Agent
+    总分从 <strong>1.00 升到 7.60 / 10（7.6&times;）</strong>，且应用层代码
+    一行未动 &mdash; 后端抽象层的工程红利在这一次迁移中就回本了。
+  </li>
+</ul>
+
+<footer>
+  作者：Yuhan Wang &middot; 2026 年 4 月 – 5 月 &middot;
+  <a href="https://huggingface.co/spaces/YUHAN03/yelp-rag-agent">在线 Demo</a>
+</footer>
+
+</body>
+</html>

@@ -118,7 +118,8 @@ def run_full_agent(question: str, business_id: Optional[str]) -> dict:
 
 def run_evaluation(config_path: str, output_name: str = "eval_results.csv",
                    resume: bool = True,
-                   overrides: Optional[dict] = None) -> None:
+                   overrides: Optional[dict] = None,
+                   only_systems: Optional[list] = None) -> None:
     cfg        = load_config(config_path)
     if overrides:
         cfg.update(overrides)
@@ -159,6 +160,8 @@ def run_evaluation(config_path: str, output_name: str = "eval_results.csv",
                 ("rag_baseline", run_rag),
                 ("full_agent",   run_full_agent),
             ]
+            if only_systems:
+                systems = [s for s in systems if s[0] in only_systems]
 
             for sys_name, sys_fn in systems:
                 done += 1
@@ -274,9 +277,18 @@ if __name__ == "__main__":
     parser.add_argument("--output",    default="eval_results.csv",
                         help="Output CSV filename inside results/")
     parser.add_argument("--no-resume", action="store_true")
+    parser.add_argument("--systems",   default=None,
+                        help="Comma-separated subset of systems to run "
+                             "(direct_llm, rag_baseline, full_agent). "
+                             "Default: all three.")
     args = parser.parse_args()
 
+    only_systems = None
+    if args.systems:
+        only_systems = [s.strip() for s in args.systems.split(",") if s.strip()]
+
     if args.run:
-        run_evaluation(args.config, args.output, resume=not args.no_resume)
+        run_evaluation(args.config, args.output, resume=not args.no_resume,
+                       only_systems=only_systems)
     elif args.summarise:
         summarise(args.output)

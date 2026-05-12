@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Yelp Business Intelligence Agent — Project Overview</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    color: #1f2937;
+    max-width: 820px;
+    margin: 30px auto;
+    padding: 0 24px;
+    font-size: 11pt;
+  }
+  h1 {
+    font-size: 26pt;
+    margin: 0 0 4px;
+    color: #111827;
+    border-bottom: 3px solid #dc2626;
+    padding-bottom: 8px;
+  }
+  h1 .emoji { color: #dc2626; }
+  .subtitle {
+    color: #6b7280;
+    font-size: 11pt;
+    margin: 0 0 18px;
+    letter-spacing: 0.02em;
+  }
+  h2 {
+    font-size: 16pt;
+    color: #b91c1c;
+    margin-top: 28px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  h3 {
+    font-size: 12pt;
+    color: #1f2937;
+    margin: 16px 0 6px;
+  }
+  p { margin: 6px 0 10px; }
+  code, .mono {
+    font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    background: #f3f4f6;
+    color: #111827;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9.5pt;
+  }
+  pre {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-left: 3px solid #dc2626;
+    padding: 10px 14px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 9pt;
+    line-height: 1.45;
+  }
+  ul, ol { margin: 6px 0 12px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 10pt;
+  }
+  th, td {
+    padding: 7px 9px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 2px solid #d1d5db;
+  }
+  tr:nth-child(even) td { background: #fafafa; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .highlight { color: #b91c1c; font-weight: 600; }
+  .callout {
+    background: #fef2f2;
+    border-left: 3px solid #dc2626;
+    padding: 10px 14px;
+    border-radius: 0 4px 4px 0;
+    margin: 12px 0;
+    font-size: 10.5pt;
+  }
+  .meta-block {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 12px 0 18px;
+    font-size: 10pt;
+  }
+  .meta-block strong { color: #b91c1c; }
+  a { color: #1d4ed8; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 8.5pt;
+    font-weight: 600;
+    margin-right: 4px;
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+  .badge.blue   { background: #dbeafe; color: #1e40af; }
+  .badge.green  { background: #d1fae5; color: #065f46; }
+  .badge.purple { background: #ede9fe; color: #5b21b6; }
+  footer {
+    margin-top: 36px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 9pt;
+    color: #6b7280;
+    text-align: center;
+  }
+  @media print {
+    body { margin: 0; }
+    h2 { page-break-after: avoid; }
+    table, pre, .callout { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1><span class="emoji">🍽️</span> Yelp Business Intelligence Agent</h1>
+<p class="subtitle">
+  A RAG-powered question-answering system comparing three architectures
+  across deployment backends &middot; April – May 2026
+</p>
+
+<div class="meta-block">
+  <strong>Live demo:</strong>
+  <a href="https://huggingface.co/spaces/YUHAN03/yelp-rag-agent">
+    huggingface.co/spaces/YUHAN03/yelp-rag-agent
+  </a><br>
+  <strong>Stack:</strong>
+  <span class="badge blue">FAISS</span>
+  <span class="badge blue">sentence-transformers</span>
+  <span class="badge purple">LangGraph ReAct</span>
+  <span class="badge purple">LangChain</span>
+  <span class="badge green">Gradio 5</span>
+  <span class="badge">Qwen2.5-7B (research)</span>
+  <span class="badge">Llama 3.1 8B / Groq (demo)</span><br>
+  <strong>Data:</strong>
+  60,823 review chunks &middot; 50,000 sampled Yelp reviews &middot; 160 businesses
+</div>
+
+<h2>1. Project Goal</h2>
+<p>
+  Build a domain-specific question-answering system on Yelp customer reviews,
+  and rigorously answer two engineering questions:
+</p>
+<ol>
+  <li>
+    <strong>Quality:</strong> Direct LLM vs fixed RAG pipeline vs autonomous
+    agent — which architecture answers domain questions best?
+  </li>
+  <li>
+    <strong>Deployment:</strong> On a single A100 80GB, how much speedup does
+    <code>AWQ</code> (W4A16 quantization) give over <code>fp16</code> baseline
+    via LMDeploy, and is there any quality regression?
+  </li>
+</ol>
+
+<h2>2. Architecture</h2>
+<pre>User question
+    │
+    ├─► Direct LLM        ── Qwen2.5-7B / Llama 3.1, parametric memory only
+    │
+    ├─► RAG Baseline      ── Stats → FAISS retrieval → structured summarisation
+    │
+    └─► Full Agent        ── LangGraph ReAct: autonomous tool selection over
+                            search / stats / classifier tools
+</pre>
+
+<h3>2.1 Retrieval stack</h3>
+<ul>
+  <li>
+    <strong>Chunk-level FAISS index</strong> (IndexFlatIP) over 60,823 chunks.
+    Reviews chunked at 180 words with sentence-aware splitting; embeddings
+    L2-normalised so inner product = cosine similarity.
+  </li>
+  <li>
+    <strong>Pre-filtered business search</strong>: a
+    <code>business_to_indices</code> map enables direct retrieval on a single
+    business's embedding subset, avoiding the global Top-K + post-filter
+    failure mode for small-volume businesses.
+  </li>
+  <li>
+    Embeddings: <code>sentence-transformers/all-MiniLM-L6-v2</code> (384-dim).
+  </li>
+</ul>
+
+<h3>2.2 Backend abstraction layer (key engineering thesis)</h3>
+<p>
+  All pipelines depend only on a <code>BaseBackend</code> interface with one
+  method, <code>generate(prompt, temperature, max_tokens) -&gt; str</code>.
+  Four concrete backends are interchangeable via YAML config:
+</p>
+<table>
+  <tr><th>Backend</th><th>Use case</th><th>Endpoint</th></tr>
+  <tr><td><code>OllamaBackend</code></td>     <td>Local development</td>            <td><code>localhost:11434</code></td></tr>
+  <tr><td><code>LMDeployBackend</code></td>   <td>A100 deployment study</td>        <td><code>OpenAI-compatible HTTP</code></td></tr>
+  <tr><td><code>GroqBackend</code></td>       <td>HF Spaces live demo (current)</td><td><code>api.groq.com/openai/v1</code></td></tr>
+  <tr><td><code>HFInferenceBackend</code></td><td>Fallback serverless option</td>   <td><code>api-inference.huggingface.co</code></td></tr>
+</table>
+<p>
+  Switching backends requires <em>no application code change</em> — only a CLI
+  flag (<code>--config configs/groq.yaml</code>) or one Space secret.
+</p>
+
+<h2>3. Research Results — A100 Deployment Study (Qwen2.5-7B)</h2>
+
+<h3>3.1 Deployment performance</h3>
+<p>Measured on a cold NVIDIA A100 80GB GPU via LMDeploy 0.7.x.</p>
+<table>
+  <tr>
+    <th>Metric</th>
+    <th class="num">fp16 (pytorch)</th>
+    <th class="num">AWQ (turbomind)</th>
+    <th class="num">AWQ advantage</th>
+  </tr>
+  <tr><td>TTFT (ms)</td>            <td class="num">693.6</td><td class="num"><strong>18.0</strong></td><td class="num highlight">38.5× faster</td></tr>
+  <tr><td>Throughput (tokens/s)</td><td class="num">73.9</td> <td class="num"><strong>166.9</strong></td><td class="num highlight">2.26× higher</td></tr>
+  <tr><td>Avg response time (s)</td><td class="num">2.00</td> <td class="num"><strong>0.91</strong></td><td class="num highlight">2.20× faster</td></tr>
+  <tr><td>VRAM peak (GB)</td>       <td class="num">64.55</td><td class="num">65.30</td><td class="num">comparable*</td></tr>
+</table>
+<p style="font-size: 9pt; color: #6b7280;">
+  *VRAM looks identical because LMDeploy's turbomind backend pre-allocates a
+  large KV-cache at startup, which dominates total allocation. On a
+  memory-constrained GPU (e.g. T4 16GB), AWQ's W4A16 weight footprint would
+  matter significantly.
+</p>
+
+<h3>3.2 Answer quality (3 systems × 20 questions, human-scored 0–2/dimension, 10 max)</h3>
+<table>
+  <tr>
+    <th>System</th>
+    <th>Backend</th>
+    <th class="num">Correctness</th><th class="num">Evidence</th>
+    <th class="num">Groundedness</th><th class="num">Tool Use</th>
+    <th class="num">Efficiency</th><th class="num">Total /10</th>
+  </tr>
+  <tr>
+    <td>Direct LLM</td><td>A100 / Qwen</td>
+    <td class="num">0.20</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">0.95</td><td class="num">1.15</td>
+  </tr>
+  <tr>
+    <td><strong>RAG Baseline</strong></td><td>A100 / Qwen</td>
+    <td class="num"><strong>1.75</strong></td><td class="num"><strong>1.90</strong></td><td class="num"><strong>1.95</strong></td><td class="num"><strong>2.00</strong></td><td class="num"><strong>1.90</strong></td><td class="num highlight">9.50</td>
+  </tr>
+  <tr style="color:#9ca3af; text-decoration: line-through;">
+    <td>Full Agent</td><td>A100 / Qwen</td>
+    <td class="num">0.00</td><td class="num">0.00</td><td class="num">0.00</td><td class="num">1.00</td><td class="num">0.00</td><td class="num">1.00</td>
+  </tr>
+  <tr>
+    <td><strong>Full Agent (fixed)</strong></td><td><strong>Groq / Llama 3.1 8B</strong></td>
+    <td class="num"><strong>1.80</strong></td><td class="num">1.30</td><td class="num">1.25</td><td class="num"><strong>1.85</strong></td><td class="num">1.40</td><td class="num highlight">7.60</td>
+  </tr>
+</table>
+<div class="callout">
+  <strong>The Full Agent &ldquo;fix&rdquo; &mdash; a 7.6&times; quality
+  recovery from one backend swap.</strong> The crossed-out row above is from
+  the original A100 study with Qwen2.5-7B, which emits non-standard
+  <code>&lt;tool_call&gt;</code> XML tags that LangChain silently drops.
+  Switching the LLM backend to Llama 3.1 8B Instant on Groq (standard
+  <code>tool_calls</code> JSON) lifted the Full Agent from 1.00 to 7.60 / 10
+  &mdash; with <strong>zero changes to pipeline or tool code</strong>, only
+  ~30 lines of new <code>GroqBackend</code> wrapper plus a YAML config.
+  <strong>0% hallucination rate</strong> in the 20-question Llama evaluation
+  (groundedness = 0 on no question).
+</div>
+<p style="font-size: 9.5pt;">
+  Even after the fix, Full Agent (7.60) is slightly below RAG Baseline (9.50)
+  on Evidence (1.30 vs 1.90) and Groundedness (1.25 vs 1.95). The gap is
+  explained by architecture: RAG Baseline's fixed pipeline forces an
+  evidence-synthesis step that emits structured <code>claim + quote</code>
+  blocks, while the Full Agent has the LLM compose answers freely &mdash;
+  more natural reading, less explicit citation.
+</p>
+
+<h2>4. Live Deployment — HF Spaces</h2>
+<p>
+  Deployed at
+  <a href="https://huggingface.co/spaces/YUHAN03/yelp-rag-agent">
+    huggingface.co/spaces/YUHAN03/yelp-rag-agent</a>
+  on the free CPU tier (no GPU needed because LLM inference is offloaded to
+  Groq).
+</p>
+<table>
+  <tr><th>Component</th><th>Where it lives</th></tr>
+  <tr><td>Code &amp; Gradio app</td>      <td>HF Space repo (this repo, pushed via git)</td></tr>
+  <tr><td>Vector store + raw data</td>    <td>HF Dataset <code>YUHAN03/yelp-rag-data</code></td></tr>
+  <tr><td>Fine-tuned RoBERTa classifier</td><td>HF Model <code>YUHAN03/yelp-roberta-5class</code></td></tr>
+  <tr><td>LLM inference (live)</td>       <td>Groq API &mdash; Llama 3.1 8B Instant, free tier</td></tr>
+</table>
+<p>
+  On startup, <code>app.py</code> detects HF Spaces via <code>SPACE_ID</code>
+  env var, then uses <code>huggingface_hub.snapshot_download</code> to pull the
+  vector store and model into the container, and initialises the Groq backend.
+  Cold start ≈ 60–90 seconds; warm requests &lt; 5 seconds.
+</p>
+
+<h2>5. Engineering Challenges &amp; Solutions</h2>
+
+<h3>5.1 Qwen2.5 tool-calling incompatibility (research finding)</h3>
+<p>
+  During the A100 study, the Full Agent system scored near-zero across all
+  dimensions despite the model correctly identifying tools to call. Root
+  cause: Qwen2.5-7B emits <code>&lt;tool_call&gt;...&lt;/tool_call&gt;</code>
+  XML tags rather than OpenAI's standard <code>tool_calls</code> JSON, which
+  LangChain's <code>ChatOpenAI</code> client cannot parse. <strong>This is a
+  framework integration limitation, not a model capability limitation</strong>
+  &mdash; documented in the benchmark report.
+</p>
+<div class="callout">
+  <strong>Resolution for the live demo:</strong> Swapped the LLM backend to
+  Llama 3.1 8B Instant via Groq, which emits standard OpenAI
+  <code>tool_calls</code>. Required <em>zero</em> changes to pipeline / tool
+  code &mdash; only one new <code>GroqBackend</code> class (≈30 lines) and a
+  YAML file. This is the engineering payoff of the backend abstraction layer.
+</div>
+
+<h3>5.2 Race condition in lazy singleton initialisation</h3>
+<p>
+  Initial HF deployment threw
+  <code>AttributeError: 'NoneType' object has no attribute 'encode'</code>
+  when the Full Agent fired multiple tool calls in parallel.
+  Root cause: LangGraph dispatches tool calls to a thread pool; the
+  <code>_load_store()</code> lazy initialiser was not thread-safe. Three
+  threads simultaneously called
+  <code>SentenceTransformer(...).to('cuda')</code>, corrupting PyTorch's
+  internal CUDA state and leaving <code>_embed_model</code> as
+  <code>None</code> in some threads' view.
+</p>
+<div class="callout">
+  <strong>Fix:</strong> Added <code>threading.Lock</code> with
+  double-checked locking around all lazy-init paths
+  (<code>retrieval_tool</code>, <code>stats_tool</code>,
+  <code>classifier_tool</code>).
+</div>
+
+<h3>5.3 Groq strict tool-message schema</h3>
+<p>
+  Groq's chat completion API rejects tool messages whose content is an empty
+  list (<code>content: []</code>) with HTTP 400. When the LLM accidentally
+  called <code>search_review_chunks_by_business</code> with a bad
+  <code>business_id</code>, the tool returned <code>[]</code> and Groq refused
+  the follow-up request.
+</p>
+<div class="callout">
+  <strong>Fix:</strong> Search tools now return JSON-serialised strings
+  (or a sentinel <em>"No matching review chunks were found..."</em> string on
+  empty results). RAG Baseline parses the JSON string back into a list.
+</div>
+
+<h3>5.4 Agent tool-set minimisation</h3>
+<p>
+  Llama 3.1 8B occasionally got stuck in loops or made redundant
+  <code>classify_review</code> calls. Pragmatic fix: removed
+  <code>summarize_evidence</code> and <code>classify_review</code> from the
+  agent's toolset (search results already include star ratings in context).
+  Final agent tool surface: <code>search_global</code>,
+  <code>search_by_business</code>, <code>get_business_stats</code>.
+</p>
+
+<h2>6. Code Layout</h2>
+<pre>yelp-rag-agent-deployment/
+├── src/yelp_rag_agent/
+│   ├── backends/        # BaseBackend + 4 concrete impls (ollama, lmdeploy, groq, hf_inference)
+│   ├── tools/           # 4 LangChain tools (retrieval / stats / classifier / summariser)
+│   ├── pipelines/       # rag_baseline.py · agent_runner.py (LangGraph ReAct)
+│   └── evaluation/      # run_eval.py · metrics.py · rubric.md · test_questions.json
+├── configs/             # ollama.yaml · lmdeploy.yaml · groq.yaml · hf_spaces.yaml
+├── notebooks/           # colab_awq_deploy · colab_quality_eval · benchmark_analysis
+├── scripts/             # serve_lmdeploy.sh · smoke_test.py · upload_to_hf.py
+├── docs/                # benchmark_report.md + PNG charts
+└── app.py               # Gradio demo (auto-detects HF Spaces)</pre>
+
+<h2>7. Take-aways</h2>
+<ul>
+  <li>
+    <strong>RAG &gt; Direct LLM by 8× on quality</strong> for domain QA, even
+    with a 7B model — retrieval grounding is the dominant factor, not model
+    size.
+  </li>
+  <li>
+    <strong>AWQ delivers 38.5× lower TTFT and 2.26× higher throughput</strong>
+    over fp16 on A100 with no measurable quality loss — production
+    deployments on a single A100 should default to AWQ + turbomind.
+  </li>
+  <li>
+    <strong>Backend abstraction pays off in real migrations</strong>: swapping
+    LMDeploy/Qwen → Groq/Llama for a free serverless demo required ~30 lines
+    of code and one YAML.
+  </li>
+  <li>
+    <strong>Framework integration bugs are real and orthogonal to model
+    quality</strong>: the &laquo;agent doesn't work on Qwen&raquo; finding is a
+    parser issue, not a reasoning issue. Swapping to Llama 3.1 8B on Groq
+    raised the Full Agent score from <strong>1.00 to 7.60 / 10
+    (7.6&times;)</strong> with zero application-layer changes &mdash; the
+    backend abstraction layer paid for itself in this single migration.
+  </li>
+</ul>
+
+<footer>
+  Project by Yuhan Wang &middot; April – May 2026 &middot;
+  <a href="https://huggingface.co/spaces/YUHAN03/yelp-rag-agent">Live demo</a>
+</footer>
+
+</body>
+</html>
