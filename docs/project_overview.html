@@ -392,6 +392,31 @@
 ├── docs/                # benchmark_report.md + PNG charts
 └── app.py               # Gradio demo (auto-detects HF Spaces)</pre>
 
+<h2>6.5 Architectural Foresight</h2>
+<p>
+  The backend abstraction layer was built for a <em>research convenience</em>
+  &mdash; the same code needed to run on Ollama (local dev) and LMDeploy
+  (A100 deployment study). It was <strong>not designed</strong> to handle a
+  framework-level tool-calling bug. But when the Qwen &harr; LangChain
+  incompatibility surfaced months later, that abstraction made the fix cost
+  ~30 lines of new code instead of a rewrite.
+</p>
+<pre>Built for:    A100 deployment study ─────┐
+                                          ├──►  Backend abstraction layer
+Saved by it:  Qwen tool-calling parser ──┘                │
+              bug (Full Agent → 1.00 / 10)                │
+                                                          ▼
+                                              30-line GroqBackend wrapper
+                                                          │
+                                                          ▼
+                                              Full Agent → 7.60 / 10  (7.6×)</pre>
+<p style="font-size: 9.5pt;">
+  An abstraction designed for one purpose paid off for a completely different
+  one. This is the kind of return that's only possible if the abstraction is
+  designed correctly the <em>first</em> time &mdash; retrofitting it after the
+  bug surfaced would have meant rewriting every pipeline.
+</p>
+
 <h2>7. Take-aways</h2>
 <ul>
   <li>

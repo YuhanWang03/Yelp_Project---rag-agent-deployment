@@ -369,6 +369,29 @@
 ├── docs/                # benchmark_report.md + PNG 图表
 └── app.py               # Gradio 演示页（自动识别 HF Spaces 环境）</pre>
 
+<h2>6.5 架构远见</h2>
+<p>
+  后端抽象层最初是为了一个<em>研究上的便利</em>而设计的 &mdash; 同一份代码
+  既要能跑在 Ollama 上（本地开发），又要能跑在 LMDeploy 上（A100 部署研究）。
+  它<strong>不是</strong>为了应付框架层 tool-calling bug 而设计的。但几个月后
+  当 Qwen &harr; LangChain 不兼容问题浮现时，这个抽象层让修复成本变成约
+  30 行新代码，而不是一次重写。
+</p>
+<pre>当初设计是为了：   A100 部署研究 ──────────────┐
+                                              ├──►  后端抽象层
+意外救了：         Qwen tool-calling 解析 bug ─┘                │
+                  (Full Agent → 1.00 / 10)                     │
+                                                                ▼
+                                                  30 行的 GroqBackend 封装
+                                                                │
+                                                                ▼
+                                                  Full Agent → 7.60 / 10（7.6×）</pre>
+<p style="font-size: 9.5pt;">
+  一个为某目的设计的抽象，意外回报了一个完全不同的场景。这种回报只有在抽象
+  <em>第一次</em>就设计对的时候才可能发生 &mdash; bug 浮现后再回头加抽象，就
+  意味着把每个 pipeline 都重写一遍。
+</p>
+
 <h2>7. 核心结论</h2>
 <ul>
   <li>
