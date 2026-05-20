@@ -8,7 +8,7 @@ class BaseBackend(ABC):
     Common interface for LLM backends.
 
     RAG pipeline and Agent code only depend on this interface —
-    never on a concrete implementation (Ollama, LMDeploy, etc.).
+    never on a concrete implementation (DeepSeek, Ollama, Groq, etc.).
     """
 
     @abstractmethod

@@ -114,7 +114,7 @@ application code changes when migrating between them**:
 | `DeepSeekBackend` | Paradigm study + live demo | `configs/deepseek_v4_flash.yaml` / `_pro.yaml` |
 | `OllamaBackend` | Local development | `configs/ollama.yaml` |
 | `GroqBackend` | Alternative serverless | `configs/groq.yaml` |
-| `LMDeployBackend` | Self-hosted OpenAI-compatible | `configs/lmdeploy.yaml` |
+| `OpenAIBackend` | Independent cross-judge | `configs/openai_judge.yaml` |
 
 ---
 
@@ -166,11 +166,11 @@ python scripts/build_paradigm_report.py
 ```
 yelp-rag-agent-deployment/
 ├── src/yelp_rag_agent/
-│   ├── backends/        # Base + DeepSeek · Ollama · Groq · LMDeploy · HF Inference
+│   ├── backends/        # Base + DeepSeek · Ollama · Groq · OpenAI · HF Inference
 │   ├── tools/           # retrieval · stats · classifier · summarizer
 │   ├── pipelines/       # rag_baseline · agent_runner (ReAct) · plan_and_solve · rewoo · reflection
 │   └── evaluation/      # run_eval · metrics · paradigm_figures · rubric · test_questions
-├── configs/             # deepseek_v4_flash/_pro · ollama · groq · lmdeploy · hf_spaces YAMLs
+├── configs/             # deepseek_v4_flash/_pro · ollama · groq · *_judge · hf_spaces YAMLs
 ├── notebooks/           # paradigm_analysis · (legacy) benchmark/colab notebooks
 ├── scripts/             # llm_judge · aggregate_paradigm_study · build_paradigm_report · smoke_test
 ├── docs/                # project_overview.html (EN + ZH) + exported PDFs

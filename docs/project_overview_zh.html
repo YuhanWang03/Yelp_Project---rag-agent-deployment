@@ -7,7 +7,7 @@
   /* 单张长纸张，让 PDF 内容连续呈现、不分页。
      如果下方仍有大段空白，把 2400mm 调小；如果内容被截掉，调大。
      中文版行高 1.7，整体内容高度约 2200-2400mm。 */
-  @page { size: 210mm 1300mm; margin: 18mm 16mm; }
+  @page { size: 210mm 1700mm; margin: 18mm 16mm; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
                  "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
@@ -213,7 +213,7 @@
   <tr><td><code>DeepSeekBackend</code></td>   <td>范式研究 + 在线 demo</td>      <td><code>api.deepseek.com/v1</code></td></tr>
   <tr><td><code>OllamaBackend</code></td>     <td>本地开发</td>                <td><code>localhost:11434</code></td></tr>
   <tr><td><code>GroqBackend</code></td>       <td>备用 serverless</td>          <td><code>api.groq.com/openai/v1</code></td></tr>
-  <tr><td><code>LMDeployBackend</code></td>   <td>自托管 OpenAI 兼容服务</td>     <td><code>OpenAI 兼容 HTTP</code></td></tr>
+  <tr><td><code>OpenAIBackend</code></td>     <td>独立交叉裁判</td>               <td><code>api.openai.com/v1</code></td></tr>
 </table>
 <p>
   切换后端<em>不需要改任何应用层代码</em> &mdash; 只需 CLI 参数
@@ -385,12 +385,12 @@
 <h2>6. 代码结构</h2>
 <pre>yelp-rag-agent-deployment/
 ├── src/yelp_rag_agent/
-│   ├── backends/        # BaseBackend + DeepSeek · Ollama · Groq · LMDeploy · HF Inference
+│   ├── backends/        # BaseBackend + DeepSeek · Ollama · Groq · OpenAI · HF Inference
 │   ├── tools/           # 4 个 LangChain 工具（retrieval / stats / classifier / summarizer）
 │   ├── pipelines/       # rag_baseline · agent_runner（ReAct）· plan_and_solve · rewoo · reflection
 │   └── evaluation/      # run_eval · metrics · paradigm_figures · rubric · test_questions
-├── configs/             # deepseek_v4_flash/_pro · ollama · groq · lmdeploy · hf_spaces
-├── notebooks/           # paradigm_analysis · （遗留）benchmark / colab notebooks
+├── configs/             # deepseek_v4_flash/_pro · ollama · groq · *_judge · hf_spaces
+├── notebooks/           # paradigm_analysis.ipynb
 ├── scripts/             # llm_judge · aggregate_paradigm_study · build_paradigm_report · smoke_test
 ├── docs/                # project_overview.html（中英）+ 导出的 PDF
 └── app.py               # Gradio 演示页（6 路范式选择器 + thinking 开关）</pre>

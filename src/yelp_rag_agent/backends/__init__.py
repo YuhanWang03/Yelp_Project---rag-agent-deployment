@@ -5,15 +5,13 @@ Usage:
     from yelp_rag_agent.backends import load_backend
 
     backend = load_backend("configs/ollama.yaml")
-    backend = load_backend("configs/lmdeploy.yaml",
-                           overrides={"model": "Qwen/Qwen2.5-7B-AWQ"})
+    backend = load_backend("configs/deepseek_v4_flash.yaml")
 """
 
 import yaml
 
 from yelp_rag_agent.backends.base import BaseBackend
 from yelp_rag_agent.backends.ollama import OllamaBackend
-from yelp_rag_agent.backends.lmdeploy import LMDeployBackend
 from yelp_rag_agent.backends.hf_inference import HFInferenceBackend
 from yelp_rag_agent.backends.groq import GroqBackend
 from yelp_rag_agent.backends.deepseek import DeepSeekBackend
@@ -21,7 +19,6 @@ from yelp_rag_agent.backends.openai_backend import OpenAIBackend
 
 _REGISTRY: dict[str, type[BaseBackend]] = {
     "ollama"       : OllamaBackend,
-    "lmdeploy"     : LMDeployBackend,
     "hf_inference" : HFInferenceBackend,
     "groq"         : GroqBackend,
     "deepseek"     : DeepSeekBackend,
@@ -61,5 +58,5 @@ def load_backend(config_path: str,
     return cls.from_config(cfg)
 
 
-__all__ = ["load_backend", "BaseBackend", "OllamaBackend", "LMDeployBackend",
+__all__ = ["load_backend", "BaseBackend", "OllamaBackend",
            "HFInferenceBackend", "GroqBackend", "DeepSeekBackend", "OpenAIBackend"]

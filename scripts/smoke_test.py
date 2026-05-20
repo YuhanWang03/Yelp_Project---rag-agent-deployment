@@ -67,7 +67,7 @@ def main():
         from yelp_rag_agent.backends import load_backend
         from yelp_rag_agent.backends.base import BaseBackend
         from yelp_rag_agent.backends.ollama import OllamaBackend
-        from yelp_rag_agent.backends.lmdeploy import LMDeployBackend
+        from yelp_rag_agent.backends.deepseek import DeepSeekBackend
 
     def test_import_tools():
         from yelp_rag_agent.tools.retrieval_tool import (
@@ -183,12 +183,6 @@ def main():
         assert isinstance(b, OllamaBackend)
         assert b.model == "qwen2.5:7b"
 
-    def test_backend_factory_lmdeploy():
-        from yelp_rag_agent.backends import load_backend
-        from yelp_rag_agent.backends.lmdeploy import LMDeployBackend
-        b = load_backend("configs/lmdeploy.yaml")
-        assert isinstance(b, LMDeployBackend)
-
     def test_backend_override():
         from yelp_rag_agent.backends import load_backend
         b = load_backend("configs/ollama.yaml", overrides={"model": "qwen2.5:14b"})
@@ -278,7 +272,6 @@ def main():
 
     check("Backend: DeepSeek usage accumulator + cost math",  test_deepseek_usage_and_cost)
     check("Backend: load OllamaBackend from YAML",          test_backend_factory_ollama)
-    check("Backend: load LMDeployBackend from YAML",        test_backend_factory_lmdeploy)
     check("Backend: load GroqBackend from YAML",            test_backend_factory_groq)
     check("Backend: load DeepSeekBackend (V4-Flash) YAML",  test_backend_factory_deepseek_flash)
     check("Backend: load DeepSeekBackend (V4-Pro) YAML",    test_backend_factory_deepseek_pro)

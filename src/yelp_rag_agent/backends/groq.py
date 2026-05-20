@@ -3,9 +3,8 @@ Groq backend.
 
 Uses Groq's OpenAI-compatible /v1/chat/completions endpoint. Groq's LPU
 inference is extremely fast (500+ tok/s) and supports native OpenAI
-function calling on Llama 3.1/3.3 and Mixtral models — which makes the
-Full Agent pipeline actually work, unlike Qwen2.5 + LMDeploy where
-LangChain can't parse Qwen's <tool_call> tags.
+function calling on Llama 3.1/3.3 and Mixtral models, so the ReAct agent
+works out of the box. Kept as an alternative serverless backend.
 
 Free tier requires only a GROQ_API_KEY (no credit card).
 

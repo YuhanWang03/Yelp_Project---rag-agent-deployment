@@ -2,9 +2,9 @@
 Yelp Business Intelligence Agent — Gradio Demo
 
 Local usage:
-    python app.py                                   # Ollama backend (default)
-    python app.py --config configs/lmdeploy.yaml    # LMDeploy backend
-    python app.py --share                           # public Gradio link
+    python app.py                                          # Ollama backend (default)
+    python app.py --config configs/deepseek_v4_flash.yaml  # DeepSeek-V4 backend
+    python app.py --share                                  # public Gradio link
 
 Hugging Face Spaces:
     Automatically detected via SPACE_ID env var. The demo runs on

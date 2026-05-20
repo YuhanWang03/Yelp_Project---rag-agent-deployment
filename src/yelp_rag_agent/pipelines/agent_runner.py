@@ -65,7 +65,6 @@ def _make_chat_model():
     """Create a LangChain chat model appropriate for the active backend."""
     from yelp_rag_agent.tools.summarizer_tool import _backend
     from yelp_rag_agent.backends.ollama import OllamaBackend
-    from yelp_rag_agent.backends.lmdeploy import LMDeployBackend
 
     if _backend is None:
         raise RuntimeError("No backend set. Call set_backend() before running the agent.")
@@ -73,15 +72,6 @@ def _make_chat_model():
     if isinstance(_backend, OllamaBackend):
         from langchain_ollama import ChatOllama
         return ChatOllama(base_url=_backend.base_url, model=_backend.model, temperature=0)
-
-    if isinstance(_backend, LMDeployBackend):
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(
-            base_url=f"{_backend.base_url}/v1",
-            api_key="none",
-            model=_backend.model,
-            temperature=0,
-        )
 
     from yelp_rag_agent.backends.hf_inference import HFInferenceBackend
     if isinstance(_backend, HFInferenceBackend):

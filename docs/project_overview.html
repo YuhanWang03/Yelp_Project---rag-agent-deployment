@@ -7,7 +7,7 @@
   /* Single tall page so the PDF flows continuously with no page breaks.
      If the bottom has white space, lower 2100mm; if content gets cut off,
      raise it. The content height is ~1900-2100mm at line-height 1.55. */
-  @page { size: 210mm 1400mm; margin: 18mm 16mm; }
+  @page { size: 210mm 1800mm; margin: 18mm 16mm; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                  "Helvetica Neue", Arial, sans-serif;
@@ -225,7 +225,7 @@ only the reasoning structure differs.
   <tr><td><code>DeepSeekBackend</code></td>   <td>Paradigm study + live demo</td>   <td><code>api.deepseek.com/v1</code></td></tr>
   <tr><td><code>OllamaBackend</code></td>     <td>Local development</td>            <td><code>localhost:11434</code></td></tr>
   <tr><td><code>GroqBackend</code></td>       <td>Alternative serverless</td>       <td><code>api.groq.com/openai/v1</code></td></tr>
-  <tr><td><code>LMDeployBackend</code></td>   <td>Self-hosted OpenAI-compatible</td><td><code>OpenAI-compatible HTTP</code></td></tr>
+  <tr><td><code>OpenAIBackend</code></td>     <td>Independent cross-judge</td>      <td><code>api.openai.com/v1</code></td></tr>
 </table>
 <p>
   Switching backends requires <em>no application code change</em> — only a CLI
@@ -454,12 +454,12 @@ only the reasoning structure differs.
 <h2>6. Code Layout</h2>
 <pre>yelp-rag-agent-deployment/
 ├── src/yelp_rag_agent/
-│   ├── backends/        # BaseBackend + DeepSeek · Ollama · Groq · LMDeploy · HF Inference
+│   ├── backends/        # BaseBackend + DeepSeek · Ollama · Groq · OpenAI · HF Inference
 │   ├── tools/           # 4 LangChain tools (retrieval / stats / classifier / summariser)
 │   ├── pipelines/       # rag_baseline · agent_runner (ReAct) · plan_and_solve · rewoo · reflection
 │   └── evaluation/      # run_eval · metrics · paradigm_figures · rubric · test_questions
-├── configs/             # deepseek_v4_flash/_pro · ollama · groq · lmdeploy · hf_spaces
-├── notebooks/           # paradigm_analysis · (legacy) benchmark / colab notebooks
+├── configs/             # deepseek_v4_flash/_pro · ollama · groq · *_judge · hf_spaces
+├── notebooks/           # paradigm_analysis.ipynb
 ├── scripts/             # llm_judge · aggregate_paradigm_study · build_paradigm_report · smoke_test
 ├── docs/                # project_overview.html (EN + ZH) + exported PDFs
 └── app.py               # Gradio demo (6-way paradigm selector + thinking toggle)</pre>

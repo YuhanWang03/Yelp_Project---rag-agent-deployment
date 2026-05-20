@@ -79,7 +79,7 @@ YAML 配置即可互换——**迁移时无需改任何应用层代码**：
 | `DeepSeekBackend` | 范式研究 + 在线 demo | `configs/deepseek_v4_flash.yaml` / `_pro.yaml` |
 | `OllamaBackend` | 本地开发 | `configs/ollama.yaml` |
 | `GroqBackend` | 备用 serverless | `configs/groq.yaml` |
-| `LMDeployBackend` | 自托管 OpenAI 兼容服务 | `configs/lmdeploy.yaml` |
+| `OpenAIBackend` | 独立交叉裁判 | `configs/openai_judge.yaml` |
 
 ---
 
@@ -135,11 +135,11 @@ python scripts/compare_judges.py
 ```
 yelp-rag-agent-deployment/
 ├── src/yelp_rag_agent/
-│   ├── backends/        # Base + DeepSeek · Ollama · Groq · LMDeploy · HF Inference
+│   ├── backends/        # Base + DeepSeek · Ollama · Groq · OpenAI · HF Inference
 │   ├── tools/           # retrieval · stats · classifier · summarizer
 │   ├── pipelines/       # rag_baseline · agent_runner (ReAct) · plan_and_solve · rewoo · reflection
 │   └── evaluation/      # run_eval · metrics · paradigm_figures · rubric · test_questions
-├── configs/             # deepseek_v4_flash/_pro · ollama · groq · lmdeploy · hf_spaces · *_judge
+├── configs/             # deepseek_v4_flash/_pro · ollama · groq · *_judge · hf_spaces
 ├── notebooks/           # paradigm_analysis.ipynb
 ├── scripts/             # llm_judge · aggregate_paradigm_study · build_paradigm_report · compare_judges · smoke_test
 ├── docs/                # project_overview.html（中英）+ 导出的 PDF
