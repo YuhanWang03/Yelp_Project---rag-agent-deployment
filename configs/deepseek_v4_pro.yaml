@@ -1,6 +1,6 @@
 backend: deepseek
-model: deepseek-v4-flash
+model: deepseek-v4-pro
 base_url: https://api.deepseek.com/v1
 thinking: false
 temperature: 0.1
-timeout: 180
+timeout: 240

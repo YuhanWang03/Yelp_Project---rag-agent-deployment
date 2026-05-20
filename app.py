@@ -7,9 +7,11 @@ Local usage:
     python app.py --share                           # public Gradio link
 
 Hugging Face Spaces:
-    Automatically detected via HF_SPACE_ID env var.
+    Automatically detected via SPACE_ID env var. The demo runs on
+    DeepSeek-V4-Flash (remote API, so the free CPU tier is fine).
     Set the following Spaces secrets:
-        HF_TOKEN         — your HuggingFace token (Inference API access)
+        DEEPSEEK_API_KEY — your DeepSeek API key (LLM inference)
+        HF_TOKEN         — your HuggingFace token (to pull data/model from Hub)
         HF_DATASET_REPO  — e.g. your-username/yelp-rag-data
         HF_MODEL_REPO    — e.g. your-username/yelp-roberta-5class
 """
@@ -110,6 +112,9 @@ from yelp_rag_agent.backends import load_backend
 from yelp_rag_agent.tools.summarizer_tool import set_backend
 from yelp_rag_agent.pipelines.rag_baseline import run_rag_pipeline
 from yelp_rag_agent.pipelines.agent_runner import run_agent
+from yelp_rag_agent.pipelines.plan_and_solve import run_plan_and_solve
+from yelp_rag_agent.pipelines.rewoo import run_rewoo
+from yelp_rag_agent.pipelines.reflection import run_reflection
 
 if IS_HF_SPACE:
     backend = load_backend("configs/hf_spaces.yaml")
@@ -265,10 +270,80 @@ def _format_stats_from_id(business_id: str | None) -> str:
     )
 
 # ---------------------------------------------------------------------------
+# Shared renderer for agentic results (Full Agent + paradigm pipelines)
+# ---------------------------------------------------------------------------
+
+def _render_agentic_result(result: dict, business_id: str | None, title: str):
+    answer     = result.get("final_answer") or result.get("answer", "*(No answer)*")
+    tool_calls = result.get("tool_calls", [])
+    elapsed    = result.get("elapsed_seconds", "?")
+
+    answer_md = f"### {title}\n\n{answer}"
+
+    meta = []
+    if result.get("thinking"):
+        meta.append("🧠 thinking **ON**")
+    if "llm_calls" in result:
+        meta.append(f"LLM calls: **{result['llm_calls']}**")
+    if "revisions" in result:
+        meta.append(f"revisions: **{result['revisions']}**")
+
+    tool_lines = [f"### ⚙️ Action Trajectory ({len(tool_calls)} steps)\n"]
+    for i, tc in enumerate(tool_calls, 1):
+        tool_lines.append(f"**Step {i}: `{tc.get('tool', '?')}`**")
+        tool_lines.append(f"- **In:** `{str(tc.get('input', ''))[:120]}`")
+        if tc.get("output"):
+            tool_lines.append(f"- **Out:** `{str(tc['output'])[:150]}…`")
+        tool_lines.append("")
+    if meta:
+        tool_lines.append(" · ".join(meta) + "\n")
+    tool_lines.append(f"*⏱️ Elapsed: **{elapsed}s***")
+    tools_md = "\n".join(tool_lines)
+
+    evid_lines   = ["### 📑 Retrieved Evidence *(from tools)*\n"]
+    has_evidence = False
+    for tc in tool_calls:
+        if "search" in tc.get("tool", ""):
+            chunks = _parse_tool_output(tc["output"])
+            if isinstance(chunks, list) and chunks:
+                for c in chunks[:3]:
+                    if not isinstance(c, dict):
+                        continue
+                    evid_lines.append(
+                        f"> ❝ *{c.get('chunk_text', '')[:200]}…* ❞\n> \n"
+                        f"> — *(★{c.get('stars', '?')}, ID: `{str(c.get('business_id', ''))[:8]}…`)*\n\n---\n"
+                    )
+                has_evidence = True
+                break
+    if not has_evidence:
+        evid_lines.append("*No retrieval chunks found in context.*")
+    evid_md = "\n".join(evid_lines)
+
+    stats_md = ""
+    for tc in tool_calls:
+        if tc.get("tool") == "get_business_stats":
+            parsed = _parse_tool_output(tc["output"])
+            if isinstance(parsed, dict):
+                stats_md = _format_stats_dict(parsed)
+            break
+    if not stats_md:
+        stats_md = _format_stats_from_id(business_id)
+
+    return answer_md, tools_md, evid_md, stats_md
+
+
+# Paradigm dispatch table (Stage E): label -> runner(question, business_id, thinking)
+PARADIGM_RUNNERS = {
+    "Plan-and-Solve": run_plan_and_solve,
+    "ReWOO"         : run_rewoo,
+    "Reflection"    : run_reflection,
+}
+
+# ---------------------------------------------------------------------------
 # Core query handler
 # ---------------------------------------------------------------------------
 
-def run_query(question: str, business_id: str, system: str):
+def run_query(question: str, business_id: str, system: str, thinking: bool = False):
     from yelp_rag_agent.tools.summarizer_tool import _backend as active_backend
 
     question    = question.strip()
@@ -350,62 +425,31 @@ def run_query(question: str, business_id: str, system: str):
         yield answer_md, tools_md, evid_md, stats_md
         return
 
-    # Full Agent -------------------------------------------------------
+    # Full Agent (ReAct) -----------------------------------------------
     if system == "Full Agent":
         try:
-            result = run_agent(question, business_id=business_id, max_iterations=6)
+            result = run_agent(question, business_id=business_id,
+                               max_iterations=6, thinking=thinking)
         except Exception as e:
             import traceback
             traceback.print_exc()
             yield f"Agent error: {type(e).__name__}: {e}", "", "", ""
             return
+        yield _render_agentic_result(result, business_id, "🤖 Agent Answer (ReAct)")
+        return
 
-        answer     = result.get("final_answer") or result.get("answer", "*(No answer)*")
-        tool_calls = result.get("tool_calls", [])
-        elapsed    = result.get("elapsed_seconds", "?")
-
-        answer_md  = f"### 🤖 Agent Answer\n\n{answer}"
-
-        tool_lines = [f"### ⚙️ Action Trajectory ({len(tool_calls)} steps)\n"]
-        for i, tc in enumerate(tool_calls, 1):
-            tool_lines.append(f"**Step {i}: `{tc.get('tool', '?')}`**")
-            tool_lines.append(f"- **In:** `{str(tc.get('input', ''))[:120]}`")
-            if tc.get("output"):
-                tool_lines.append(f"- **Out:** `{str(tc['output'])[:150]}…`")
-            tool_lines.append("")
-        tool_lines.append(f"*⏱️ Elapsed: **{elapsed}s***")
-        tools_md = "\n".join(tool_lines)
-
-        evid_lines   = ["### 📑 Retrieved Evidence *(from tools)*\n"]
-        has_evidence = False
-        for tc in tool_calls:
-            if "search" in tc.get("tool", ""):
-                chunks = _parse_tool_output(tc["output"])
-                if isinstance(chunks, list) and chunks:
-                    for c in chunks[:3]:
-                        if not isinstance(c, dict):
-                            continue
-                        evid_lines.append(
-                            f"> ❝ *{c.get('chunk_text', '')[:200]}…* ❞\n> \n"
-                            f"> — *(★{c.get('stars', '?')}, ID: `{str(c.get('business_id', ''))[:8]}…`)*\n\n---\n"
-                        )
-                    has_evidence = True
-                    break
-        if not has_evidence:
-            evid_lines.append("*No retrieval chunks found in context.*")
-        evid_md = "\n".join(evid_lines)
-
-        stats_md = ""
-        for tc in tool_calls:
-            if tc.get("tool") == "get_business_stats":
-                parsed = _parse_tool_output(tc["output"])
-                if isinstance(parsed, dict):
-                    stats_md = _format_stats_dict(parsed)
-                break
-        if not stats_md:
-            stats_md = _format_stats_from_id(business_id)
-
-        yield answer_md, tools_md, evid_md, stats_md
+    # Paradigm pipelines: Plan-and-Solve / ReWOO / Reflection ----------
+    if system in PARADIGM_RUNNERS:
+        try:
+            result = PARADIGM_RUNNERS[system](
+                question, business_id=business_id, thinking=thinking
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield f"{system} error: {type(e).__name__}: {e}", "", "", ""
+            return
+        yield _render_agentic_result(result, business_id, f"🤖 {system} Answer")
         return
 
     yield "Unknown system.", "", "", ""
@@ -434,11 +478,14 @@ def build_ui():
             with gr.Column(scale=3):
                 gr.Markdown(
                     "# 🍽️ Yelp Business Intelligence Agent\n"
-                    "**FAISS Retrieval · LangGraph ReAct · Llama 3.1 8B Instant (Groq)**\n\n"
-                    "Ask questions about Yelp businesses using three systems:\n"
+                    "**FAISS Retrieval · Reasoning-paradigm comparison · DeepSeek-V4**\n\n"
+                    "Ask questions about Yelp businesses using six systems:\n"
                     "- **Direct LLM** — no retrieval baseline\n"
                     "- **RAG Baseline** — fixed pipeline (Stats → Search → Summarize)\n"
-                    "- **Full Agent** — LangGraph ReAct with autonomous tool selection\n\n"
+                    "- **Full Agent** — ReAct (interleaved reason→act)\n"
+                    "- **Plan-and-Solve** — plan all steps → sequential execute → solve\n"
+                    "- **ReWOO** — plan → parallel execute → solve\n"
+                    "- **Reflection** — answer → self-critique → revise\n\n"
                     "> Vector store: 60,823 chunks · 160 businesses · all-MiniLM-L6-v2"
                 )
                 question_input = gr.Textbox(
@@ -457,8 +504,13 @@ def build_ui():
                     placeholder="e.g. ORL4JE6tz3rJxVqkdKfegA",
                 )
                 system_input = gr.Dropdown(
-                    choices=["RAG Baseline", "Full Agent", "Direct LLM"],
-                    value="RAG Baseline", label="System",
+                    choices=["RAG Baseline", "Full Agent", "Plan-and-Solve",
+                             "ReWOO", "Reflection", "Direct LLM"],
+                    value="RAG Baseline", label="System / Reasoning Paradigm",
+                )
+                thinking_checkbox = gr.Checkbox(
+                    value=False,
+                    label="🧠 Thinking mode (DeepSeek V4 only — ignored on other backends)",
                 )
                 submit_btn = gr.Button("Run Query", variant="primary")
                 business_dropdown.change(
@@ -487,25 +539,27 @@ def build_ui():
 
         submit_btn.click(
             fn=run_query,
-            inputs=[question_input, business_id_input, system_input],
+            inputs=[question_input, business_id_input, system_input, thinking_checkbox],
             outputs=[answer_output, tools_output, evidence_output, stats_output],
         )
 
         gr.Markdown(
             "---\n"
-            "### 📊 Original Research Benchmark\n"
-            "Qwen2.5-7B on A100 80GB · 20 questions · human scored 0–5 per dimension\n\n"
-            "| System | Correctness | Evidence | Groundedness | Tool Use | Efficiency | **Total /25** |\n"
-            "|---|---|---|---|---|---|---|\n"
-            "| Direct LLM | 0.20 | 0.00 | 0.00 | 0.00 | 0.95 | **1.15** |\n"
-            "| RAG Baseline | 1.75 | 1.90 | 1.95 | 2.00 | 1.90 | **9.50** |\n"
-            "| Full Agent | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | **1.00** |\n\n"
-            "**Deployment study (A100):** AWQ (turbomind) achieves **38.5× lower TTFT** and "
-            "**2.26× higher throughput** vs fp16 (pytorch) with no quality loss.\n\n"
-            "> *The live demo above runs on Groq's Llama 3.1 8B Instant for fast, free interactive use. "
-            "The benchmark numbers come from the project's original A100 deployment study with Qwen2.5-7B. "
-            "Full Agent's low score there was caused by a Qwen↔LangChain tool-calling parser incompatibility "
-            "that this Llama-based demo resolves.*"
+            "### 📊 Reasoning Paradigm Study (DeepSeek-V4, 20 questions, LLM-as-judge)\n"
+            "Quality is **saturated** for every retrieval-grounded approach — the "
+            "paradigm choice is an *efficiency* tradeoff, not a quality one.\n\n"
+            "| System | Quality /8 | Latency (s) | Cost ($/q) |\n"
+            "|---|---|---|---|\n"
+            "| Direct LLM | 0.2 | 3.8 | 0.00007 |\n"
+            "| RAG Baseline | 7.8 | 3.2 | 0.00016 |\n"
+            "| ReAct | 8.0 | 11.8 | 0.00118 |\n"
+            "| Plan-and-Solve | 7.9 | 6.4 | 0.00040 |\n"
+            "| ReWOO | 7.9 | 6.2 | 0.00036 |\n"
+            "| Reflection | 7.9 | 10.8 | 0.00081 |\n\n"
+            "> *All six systems run on DeepSeek-V4. Retrieval — not reasoning "
+            "structure — drives quality (Direct LLM has none and fails). "
+            "Reflection and thinking mode add 2–4× cost/latency for no quality "
+            "gain. See the project report for the full study.*"
         )
     return demo
 

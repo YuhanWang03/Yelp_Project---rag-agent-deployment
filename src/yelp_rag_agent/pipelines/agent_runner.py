@@ -57,7 +57,8 @@ Guidelines:
 """
 
 _agent = None
-_agent_backend = None  # track which backend instance was used to build the agent
+_agent_backend = None   # track which backend instance was used to build the agent
+_agent_thinking = None  # rebuild the agent when the thinking toggle changes
 
 
 def _make_chat_model():
@@ -102,13 +103,33 @@ def _make_chat_model():
             temperature=0,
         )
 
+    from yelp_rag_agent.backends.deepseek import DeepSeekBackend
+    if isinstance(_backend, DeepSeekBackend):
+        from langchain_openai import ChatOpenAI
+        # V4 defaults thinking ON, so always send the explicit state via
+        # extra_body. Sampling params are ignored in thinking mode, so only
+        # pin temperature=0 when thinking is off.
+        kwargs = dict(
+            base_url=_backend.base_url,
+            api_key=_backend.api_key,
+            model=_backend.model,
+            extra_body={"thinking": {
+                "type": "enabled" if _backend.thinking else "disabled"
+            }},
+        )
+        if not _backend.thinking:
+            kwargs["temperature"] = 0
+        return ChatOpenAI(**kwargs)
+
     raise RuntimeError(f"Unsupported backend type for agent: {type(_backend).__name__}")
 
 
 def _get_agent():
-    global _agent, _agent_backend
+    global _agent, _agent_backend, _agent_thinking
     from yelp_rag_agent.tools.summarizer_tool import _backend
-    if _agent is None or _backend is not _agent_backend:
+    cur_thinking = getattr(_backend, "thinking", None)
+    if (_agent is None or _backend is not _agent_backend
+            or cur_thinking != _agent_thinking):
         print("[agent_runner] Initialising LangGraph ReAct agent …")
         llm = _make_chat_model()
         tools = [
@@ -118,6 +139,7 @@ def _get_agent():
         ]
         _agent = create_react_agent(llm, tools)
         _agent_backend = _backend
+        _agent_thinking = cur_thinking
         print("[agent_runner] Agent ready.")
     return _agent
 
@@ -127,6 +149,20 @@ def _safe_tc_field(tc, key, default=""):
     if isinstance(tc, dict):
         return tc.get(key, default)
     return getattr(tc, key, default)
+
+
+def _extract_usage(messages: list) -> dict:
+    """Sum LangChain usage_metadata across AIMessages into the normalized
+    usage shape (cache breakdown / reasoning tokens unavailable here → 0)."""
+    usage = {"calls": 0, "input_tokens": 0, "input_cached_tokens": 0,
+             "output_tokens": 0, "reasoning_tokens": 0}
+    for msg in messages:
+        um = getattr(msg, "usage_metadata", None)
+        if um:
+            usage["calls"]         += 1
+            usage["input_tokens"]  += um.get("input_tokens", 0)
+            usage["output_tokens"] += um.get("output_tokens", 0)
+    return usage
 
 
 def _extract_trace(messages: list) -> tuple[str, list[dict]]:
@@ -166,7 +202,26 @@ def run_agent(
     question: str,
     business_id: Optional[str] = None,
     max_iterations: int = 10,
+    thinking: bool = False,
 ) -> dict:
+    # Set thinking on the backend (DeepSeek only; no-op elsewhere) BEFORE
+    # _get_agent(), so the rebuilt agent's ChatOpenAI carries the right
+    # extra_body. _get_agent keys its cache on the thinking state.
+    from yelp_rag_agent.pipelines._paradigm_common import apply_thinking
+    from yelp_rag_agent.tools.summarizer_tool import _backend as _bk
+
+    # DeepSeek V4 thinking mode is incompatible with multi-turn ReAct: the API
+    # requires the prior turn's reasoning_content to be replayed, which the
+    # OpenAI-compatible agent client does not do (→ 400 on the 2nd turn).
+    # Degrade loudly to thinking=off rather than crash the run.
+    thinking_unsupported = False
+    if thinking and type(_bk).__name__ == "DeepSeekBackend":
+        print("[agent_runner] WARNING: thinking mode unsupported for ReAct on "
+              "DeepSeek (reasoning_content replay). Falling back to thinking=OFF.")
+        thinking = False
+        thinking_unsupported = True
+    apply_thinking(_bk, thinking)
+
     full_question = question
     if business_id:
         full_question = f"{question}\n\n[Target business_id: {business_id}]"
@@ -207,6 +262,7 @@ def run_agent(
 
     messages = result["messages"]
     final_answer, tool_calls = _extract_trace(messages)
+    token_usage = _extract_usage(messages)
 
     print(f"\n  Tool calls ({len(tool_calls)}):")
     for i, tc in enumerate(tool_calls, 1):
@@ -216,8 +272,15 @@ def run_agent(
     return {
         "question"       : question,
         "business_id"    : business_id,
+        "paradigm"       : "react",
+        "thinking"       : thinking,
+        "thinking_unsupported": thinking_unsupported,
         "final_answer"   : final_answer,
         "tool_calls"     : tool_calls,
         "steps"          : len(tool_calls),
+        # ReAct interleaves one LLM decision per tool call plus the final
+        # answer turn — an approximation, exact count varies with retries.
+        "llm_calls"      : len(tool_calls) + 1,
+        "token_usage"    : token_usage,
         "elapsed_seconds": elapsed,
     }

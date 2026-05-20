@@ -44,6 +44,9 @@ def main():
                         help="Run tests that require a running LLM backend")
     parser.add_argument("--config", default="configs/ollama.yaml",
                         help="Backend config for --full tests")
+    parser.add_argument("--deepseek", action="store_true",
+                        help="Run DeepSeek-V4 tool-call format gate test "
+                             "(requires DEEPSEEK_API_KEY env var)")
     args = parser.parse_args()
 
     print(f"\n{'='*55}")
@@ -201,10 +204,87 @@ def main():
         assert isinstance(b, GroqBackend)
         assert b.model == "llama-3.1-8b-instant"
 
-    check("Backend: load OllamaBackend from YAML",   test_backend_factory_ollama)
-    check("Backend: load LMDeployBackend from YAML", test_backend_factory_lmdeploy)
-    check("Backend: load GroqBackend from YAML",     test_backend_factory_groq)
-    check("Backend: CLI override applied",           test_backend_override)
+    def test_backend_factory_deepseek_flash():
+        import os
+        from yelp_rag_agent.backends import load_backend
+        from yelp_rag_agent.backends.deepseek import DeepSeekBackend
+        b = load_backend("configs/deepseek_v4_flash.yaml",
+                         overrides={"api_key": os.environ.get("DEEPSEEK_API_KEY", "dummy")})
+        assert isinstance(b, DeepSeekBackend)
+        assert b.model == "deepseek-v4-flash"
+        assert b.thinking is False
+
+    def test_backend_factory_deepseek_pro():
+        import os
+        from yelp_rag_agent.backends import load_backend
+        from yelp_rag_agent.backends.deepseek import DeepSeekBackend
+        b = load_backend("configs/deepseek_v4_pro.yaml",
+                         overrides={"api_key": os.environ.get("DEEPSEEK_API_KEY", "dummy")})
+        assert isinstance(b, DeepSeekBackend)
+        assert b.model == "deepseek-v4-pro"
+
+    def test_backend_factory_openai_judge():
+        import os
+        from yelp_rag_agent.backends import load_backend
+        from yelp_rag_agent.backends.openai_backend import OpenAIBackend
+        b = load_backend("configs/openai_judge.yaml",
+                         overrides={"api_key": os.environ.get("OPENAI_API_KEY", "dummy")})
+        assert isinstance(b, OpenAIBackend)
+        assert b.base_url == "https://api.openai.com/v1"
+
+    def test_deepseek_thinking_payload():
+        # Unit test: verify thinking toggle produces the correct nested field.
+        # No API call. V4 defaults thinking ON, so 'off' MUST send 'disabled'
+        # explicitly — assert both directions to catch a silent no-op.
+        from yelp_rag_agent.backends.deepseek import DeepSeekBackend
+        b = DeepSeekBackend(model="deepseek-v4-flash", api_key="dummy",
+                            thinking=False)
+        payload = b._build_payload("hi", temperature=0.1, max_tokens=10)
+        assert payload["thinking"] == {"type": "disabled"}, \
+            "thinking=False must send {'type': 'disabled'} (default is ON)"
+        assert "temperature" in payload, \
+            "temperature should be sent when thinking is off"
+        assert payload["max_tokens"] == 10, \
+            "thinking-off must pass max_tokens through unchanged"
+        b.thinking = True
+        payload = b._build_payload("hi", temperature=0.1, max_tokens=10)
+        assert payload["thinking"] == {"type": "enabled"}, \
+            "thinking=True must send {'type': 'enabled'}"
+        assert "temperature" not in payload, \
+            "temperature is ignored in thinking mode; should be omitted"
+        # Thinking shares max_tokens with reasoning_content (emitted first), so
+        # the budget must be bumped or the answer gets truncated to empty.
+        assert payload["max_tokens"] > 10, \
+            "thinking-on must add reasoning headroom to max_tokens"
+
+    def test_deepseek_usage_and_cost():
+        # Usage accumulator sums across calls + resets; cost math matches the
+        # published V4 list prices. No API call.
+        from yelp_rag_agent.backends.deepseek import DeepSeekBackend
+        from yelp_rag_agent.evaluation.metrics import compute_cost
+        b = DeepSeekBackend(model="deepseek-v4-flash", api_key="dummy")
+        b._accumulate_usage({"prompt_tokens": 300, "completion_tokens": 500,
+                             "prompt_cache_hit_tokens": 256,
+                             "completion_tokens_details": {"reasoning_tokens": 400}})
+        u = b.get_usage()
+        assert u["calls"] == 1 and u["input_tokens"] == 300
+        assert u["output_tokens"] == 500 and u["reasoning_tokens"] == 400
+        b.reset_usage()
+        assert b.get_usage()["calls"] == 0, "reset_usage must zero the accumulator"
+        c = compute_cost({"input_tokens": 1_000_000, "input_cached_tokens": 0,
+                          "output_tokens": 1_000_000}, "deepseek-v4-flash")
+        assert abs(c["total_cost_usd"] - 0.42) < 1e-9, f"flash cost wrong: {c}"
+        assert compute_cost({"input_tokens": 1}, "llama-3.1-8b")["total_cost_usd"] is None
+
+    check("Backend: DeepSeek usage accumulator + cost math",  test_deepseek_usage_and_cost)
+    check("Backend: load OllamaBackend from YAML",          test_backend_factory_ollama)
+    check("Backend: load LMDeployBackend from YAML",        test_backend_factory_lmdeploy)
+    check("Backend: load GroqBackend from YAML",            test_backend_factory_groq)
+    check("Backend: load DeepSeekBackend (V4-Flash) YAML",  test_backend_factory_deepseek_flash)
+    check("Backend: load DeepSeekBackend (V4-Pro) YAML",    test_backend_factory_deepseek_pro)
+    check("Backend: load OpenAIBackend (judge) YAML",       test_backend_factory_openai_judge)
+    check("Backend: DeepSeek thinking flag injects payload", test_deepseek_thinking_payload)
+    check("Backend: CLI override applied",                  test_backend_override)
 
     # ------------------------------------------------------------------
     # 6. summarizer_tool raises without backend (no LLM needed)
@@ -270,6 +350,100 @@ def main():
           test_summarize_with_backend, skip=not args.full)
     check("LLM: RAG pipeline end-to-end (Flow A)",
           test_rag_pipeline_end_to_end, skip=not args.full)
+
+    # ------------------------------------------------------------------
+    # 8. DeepSeek-V4 tool-call format gate (Stage E)
+    #
+    # CRITICAL: this is the gate test for Stage E. Verifies V4 emits
+    # standard OpenAI `tool_calls` JSON (not Qwen-style <tool_call> XML
+    # embedded in `content`). If this fails, Stage E2 pipelines cannot
+    # rely on LangChain's tool_calls parser and the Qwen-era bug repeats.
+    # ------------------------------------------------------------------
+    def test_deepseek_tool_call_format():
+        import os, requests
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
+        assert api_key, "DEEPSEEK_API_KEY not set"
+        tool_schema = [{
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get current weather for a city.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string", "description": "City name"},
+                    },
+                    "required": ["city"],
+                },
+            },
+        }]
+        resp = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model"      : "deepseek-v4-flash",
+                "messages"   : [{"role": "user",
+                                 "content": "What's the weather in Tokyo?"}],
+                "tools"      : tool_schema,
+                "tool_choice": "auto",
+                "temperature": 0,
+                "max_tokens" : 256,
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        msg = resp.json()["choices"][0]["message"]
+        # The critical assertion: tool calls must surface as a structured
+        # `tool_calls` list, NOT as XML/JSON glob inside `content`.
+        assert msg.get("tool_calls"), (
+            f"V4 did NOT return tool_calls field. message={msg}. "
+            f"If tool intent is hidden in content, Stage E2 pipelines will "
+            f"break the same way Qwen2.5 did."
+        )
+        tc = msg["tool_calls"][0]
+        assert tc["function"]["name"] == "get_weather", \
+            f"Wrong tool name: {tc['function']['name']}"
+
+    check("DeepSeek-V4: tool_calls format (Stage E gate test)",
+          test_deepseek_tool_call_format, skip=not args.deepseek)
+
+    def test_deepseek_thinking_mode_live():
+        # Verifies the thinking toggle ACTUALLY works against the live API in
+        # both directions (2 calls). Catches the silent-default-on failure:
+        # thinking=enabled must return reasoning_content; disabled must not.
+        import os, requests
+        from yelp_rag_agent.backends.deepseek import DeepSeekBackend
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
+        assert api_key, "DEEPSEEK_API_KEY not set"
+
+        def call(thinking: bool) -> dict:
+            b = DeepSeekBackend(model="deepseek-v4-flash", api_key=api_key,
+                                thinking=thinking)
+            payload = b._build_payload(
+                "What is 17 * 23? Show your reasoning.",
+                temperature=0.1, max_tokens=512,
+            )
+            resp = requests.post(
+                "https://api.deepseek.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload, timeout=120,
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]
+
+        on  = call(True)
+        off = call(False)
+        assert on.get("reasoning_content"), (
+            "thinking=enabled returned no reasoning_content — the toggle is "
+            "not activating thinking mode (check field name/format)."
+        )
+        assert not off.get("reasoning_content"), (
+            "thinking=disabled still returned reasoning_content — V4's "
+            "default-on was not overridden; thinking-off eval arm is invalid."
+        )
+
+    check("DeepSeek-V4: thinking toggle live (on/off reasoning_content)",
+          test_deepseek_thinking_mode_live, skip=not args.deepseek)
 
     # ------------------------------------------------------------------
     # Summary
