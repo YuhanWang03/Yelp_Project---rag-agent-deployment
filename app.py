@@ -189,7 +189,7 @@ EXAMPLES = [
      "Direct LLM"],
     ["Analyze the main weaknesses of this business based on reviews.",
      "Santa Barbara Shellfish Company — Santa Barbara (★4.0, 203 chunks)",
-     "Full Agent"],
+     "ReAct"],
     ["Summarise the top three complaints in the negative reviews of this business.",
      "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
      "RAG Baseline"],
@@ -200,7 +200,7 @@ EXAMPLES = [
      "RAG Baseline"],
     ["How do customers describe the service and staff at this business?",
      "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
-     "Full Agent"],
+     "ReAct"],
     ["What do reviewers say about cleanliness and room conditions?",
      "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
      "RAG Baseline"],
@@ -208,7 +208,7 @@ EXAMPLES = [
     # — Business Profiling (holistic overview) ———————————————————————————
     ["Give me an overall profile of this business based on customer reviews.",
      "Gaylord Opryland Resort & Convention Center — Nashville (★3.0, 275 chunks)",
-     "Full Agent"],
+     "ReAct"],
     ["What are the main strengths and weaknesses of this business?",
      "Santa Barbara Shellfish Company — Santa Barbara (★4.0, 203 chunks)",
      "RAG Baseline"],
@@ -217,11 +217,11 @@ EXAMPLES = [
     ["What aspects do customers praise and criticize about food and service?",
      "(Global search — no specific business)", "RAG Baseline"],
     ["What do customers commonly praise in 5-star reviews?",
-     "(Global search — no specific business)", "Full Agent"],
+     "(Global search — no specific business)", "ReAct"],
     ["What are the most common reasons customers say they will never return?",
      "(Global search — no specific business)", "RAG Baseline"],
     ["Do Yelp reviews show any patterns between wait time complaints and star ratings?",
-     "(Global search — no specific business)", "Full Agent"],
+     "(Global search — no specific business)", "ReAct"],
 ]
 
 # ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ def _format_stats_from_id(business_id: str | None) -> str:
     )
 
 # ---------------------------------------------------------------------------
-# Shared renderer for agentic results (Full Agent + paradigm pipelines)
+# Shared renderer for agentic results (ReAct + paradigm pipelines)
 # ---------------------------------------------------------------------------
 
 def _render_agentic_result(result: dict, business_id: str | None, title: str):
@@ -425,8 +425,8 @@ def run_query(question: str, business_id: str, system: str, thinking: bool = Fal
         yield answer_md, tools_md, evid_md, stats_md
         return
 
-    # Full Agent (ReAct) -----------------------------------------------
-    if system == "Full Agent":
+    # ReAct -----------------------------------------------------------
+    if system == "ReAct":
         try:
             result = run_agent(question, business_id=business_id,
                                max_iterations=6, thinking=thinking)
@@ -482,7 +482,7 @@ def build_ui():
                     "Ask questions about Yelp businesses using six systems:\n"
                     "- **Direct LLM** — no retrieval baseline\n"
                     "- **RAG Baseline** — fixed pipeline (Stats → Search → Summarize)\n"
-                    "- **Full Agent** — ReAct (interleaved reason→act)\n"
+                    "- **ReAct** — interleaved reason→act (autonomous tools)\n"
                     "- **Plan-and-Solve** — plan all steps → sequential execute → solve\n"
                     "- **ReWOO** — plan → parallel execute → solve\n"
                     "- **Reflection** — answer → self-critique → revise\n\n"
@@ -504,7 +504,7 @@ def build_ui():
                     placeholder="e.g. ORL4JE6tz3rJxVqkdKfegA",
                 )
                 system_input = gr.Dropdown(
-                    choices=["RAG Baseline", "Full Agent", "Plan-and-Solve",
+                    choices=["RAG Baseline", "ReAct", "Plan-and-Solve",
                              "ReWOO", "Reflection", "Direct LLM"],
                     value="RAG Baseline", label="System / Reasoning Paradigm",
                 )
