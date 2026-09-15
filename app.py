@@ -32,6 +32,12 @@ SYSTEMS = [
 RETRIEVAL_SYSTEMS = set(SYSTEMS) - {"Direct LLM"}
 _retrieval_warmed = False
 
+DEEPSEEK_MODELS = {
+    "DeepSeek V4 Flash": "configs/deepseek_v4_flash.yaml",
+    "DeepSeek V4 Pro": "configs/deepseek_v4_pro.yaml",
+}
+DEFAULT_DEEPSEEK_MODEL = "DeepSeek V4 Flash"
+
 SYSTEM_META = {
     "Direct LLM": ("CONTROL", "No retrieval", "🟠"),
     "RAG Baseline": ("FIXED FLOW", "Stats → Search → Summarize", "🟢"),
@@ -65,7 +71,20 @@ def _extract_chunks(tool_calls: list[dict]) -> list[dict]:
     return []
 
 
-def _run_one(system: str, question: str, business_id: str | None, thinking: bool) -> dict:
+def _activate_model(model_label: str):
+    """Create a fresh non-thinking DeepSeek backend for one comparison run."""
+    config_path = DEEPSEEK_MODELS.get(model_label)
+    if config_path is None:
+        raise ValueError(f"Unsupported model: {model_label}")
+    backend = legacy.load_backend(config_path)
+    # DeepSeek defaults to thinking in some API modes, so keep this explicit.
+    backend.thinking = False
+    legacy.backend = backend
+    legacy.set_backend(backend)
+    return backend
+
+
+def _run_one(system: str, question: str, business_id: str | None) -> dict:
     """Run one existing pipeline and normalize its result for the new UI."""
     backend = legacy.backend
     if hasattr(backend, "reset_usage"):
@@ -125,11 +144,11 @@ def _run_one(system: str, question: str, business_id: str | None, thinking: bool
         raw["chunks"] = chunks
     elif system == "ReAct":
         raw = legacy.run_agent(
-            question, business_id=business_id, max_iterations=6, thinking=thinking
+            question, business_id=business_id, max_iterations=6, thinking=False
         )
     elif system in legacy.PARADIGM_RUNNERS:
         raw = legacy.PARADIGM_RUNNERS[system](
-            question, business_id=business_id, thinking=thinking
+            question, business_id=business_id, thinking=False
         )
     else:
         raise ValueError(f"Unknown system: {system}")
@@ -153,7 +172,7 @@ def _run_one(system: str, question: str, business_id: str | None, thinking: bool
         "tool_count": len(tool_calls),
         "chunks": chunks,
         "usage": usage,
-        "thinking": raw.get("thinking", False),
+        "model": backend.model,
         "revisions": raw.get("revisions"),
     }
 
@@ -342,11 +361,11 @@ def _summary_rows(results: list[dict]) -> list[list]:
     return [
         [
             r["system"],
+            r["model"],
             r["elapsed"],
             r["llm_calls"],
             r["tool_count"],
             "Yes" if r["chunks"] else "No",
-            "On" if r["thinking"] else "Off",
         ]
         for r in results
     ]
@@ -374,7 +393,7 @@ def _warmup_retrieval() -> float:
     return round(time.time() - started, 2)
 
 
-def compare(question: str, business_id: str, selected: list[str], thinking: bool):
+def compare(question: str, business_id: str, selected: list[str], model_label: str):
     question = (question or "").strip()
     business_id = (business_id or "").strip() or None
     selected = selected or []
@@ -387,6 +406,13 @@ def compare(question: str, business_id: str, selected: list[str], thinking: bool
         ] + [[], "", ""]
         return
 
+    try:
+        _activate_model(model_label)
+    except Exception as exc:
+        message = f"Model initialization failed: {type(exc).__name__}: {exc}"
+        yield [message] + [_card(None, s) for s in SYSTEMS] + [[], "", ""]
+        return
+
     cards = {
         system: _card(None, system, "waiting") if system in selected else _card(None, system)
         for system in SYSTEMS
@@ -394,7 +420,7 @@ def compare(question: str, business_id: str, selected: list[str], thinking: bool
     results: list[dict] = []
     warmup_seconds = 0.0
     if any(system in RETRIEVAL_SYSTEMS for system in selected):
-        yield ["Warming up retrieval · loading vector store and embedding model…"] + [
+        yield [f"{model_label} · warming up retrieval and embedding model…"] + [
             cards[s] for s in SYSTEMS
         ] + [[], "", ""]
         try:
@@ -422,7 +448,7 @@ def compare(question: str, business_id: str, selected: list[str], thinking: bool
             _summary_rows(results), _evidence_markdown(results), _trace_markdown(results)
         ]
         try:
-            result = _run_one(system, question, business_id, thinking)
+            result = _run_one(system, question, business_id)
             results.append(result)
             cards[system] = _card(result, system)
         except Exception as exc:
@@ -435,7 +461,7 @@ def compare(question: str, business_id: str, selected: list[str], thinking: bool
     warmup_note = (
         f" · retrieval warm-up {warmup_seconds}s excluded" if warmup_seconds else ""
     )
-    yield [f"Comparison complete · {len(results)}/{len(selected)} succeeded{warmup_note}"] + [
+    yield [f"Comparison complete · {model_label} · {len(results)}/{len(selected)} succeeded{warmup_note}"] + [
         cards[s] for s in SYSTEMS
     ] + [_summary_rows(results), _evidence_markdown(results), _trace_markdown(results)]
 
@@ -662,8 +688,12 @@ def build_comparison_ui():
                     value=["Direct LLM", "RAG Baseline", "ReAct"],
                     label="Systems to compare",
                 )
-                thinking = gr.Checkbox(
-                    label="DeepSeek thinking mode (where supported)", value=False
+                model = gr.Dropdown(
+                    choices=list(DEEPSEEK_MODELS),
+                    value=DEFAULT_DEEPSEEK_MODEL,
+                    label="DeepSeek model",
+                    info="One model is shared by all selected reasoning systems.",
+                    interactive=True,
                 )
                 run = gr.Button("Run comparison", variant="primary", elem_id="run-btn")
                 status = gr.Markdown("Ready · choose at least two systems", elem_id="status-box")
@@ -690,8 +720,8 @@ def build_comparison_ui():
                             )
                 gr.Markdown("## Run summary")
                 summary = gr.Dataframe(
-                    headers=["System", "Latency (s)", "LLM calls", "Tool calls", "Evidence", "Thinking"],
-                    datatype=["str", "number", "number", "number", "str", "str"],
+                    headers=["System", "Model", "Latency (s)", "LLM calls", "Tool calls", "Evidence"],
+                    datatype=["str", "str", "number", "number", "number", "str"],
                     interactive=False, wrap=True,
                 )
 
@@ -722,8 +752,9 @@ def build_comparison_ui():
         outputs = [status] + card_outputs + [summary, evidence, traces]
         run.click(
             compare,
-            inputs=[question, business_id, selected, thinking],
+            inputs=[question, business_id, selected, model],
             outputs=outputs,
+            concurrency_limit=1,
         )
 
     return demo
